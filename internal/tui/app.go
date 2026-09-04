@@ -93,6 +93,7 @@ type App struct {
 	result      viewport.Model
 	resultTitle string
 	resultCmd   slashCommand
+	recapBody   string
 
 	chat          viewport.Model
 	chatInput     textinput.Model
@@ -242,6 +243,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if wmsg, ok := msg.(tea.WindowSizeMsg); ok {
 		a.width, a.height = wmsg.Width, wmsg.Height
+		a.result.Width, a.result.Height = wmsg.Width, max(4, wmsg.Height-6)
+		a.chat.Width, a.chat.Height = wmsg.Width, max(4, wmsg.Height-6)
+	}
+
+	if rm, ok := msg.(recapMsg); ok {
+		a.applyRecap(rm)
+		return a, nil
 	}
 
 	switch a.screen {

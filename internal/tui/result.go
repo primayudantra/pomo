@@ -36,12 +36,20 @@ func (a *App) runReportCommand(c slashCommand, args []string) (tea.Model, tea.Cm
 		}
 		body := report.RenderText(sum)
 		a.resultTitle = c.Name + " " + win.Label
-		a.result.SetContent(body)
-		a.result.GotoTop()
 		a.screen = screenResult
 		if c.Name == "/insights" {
+			if a.cfg.AI.Provider == "" {
+				a.result.SetContent(body + "\nRECAP  (set ai.provider + ai.key for an AI recap)\n")
+				a.result.GotoTop()
+				return a, nil
+			}
+			a.recapBody = body
+			a.result.SetContent(body + "\nRECAP  …thinking\n")
+			a.result.GotoTop()
 			return a, a.startRecap(sum)
 		}
+		a.result.SetContent(body)
+		a.result.GotoTop()
 		return a, nil
 	}
 }
