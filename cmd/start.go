@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
+	"pomo/internal/gitinfo"
 	"pomo/internal/model"
 	"pomo/internal/pomoconfig"
 	"pomo/internal/tui"
@@ -58,6 +59,9 @@ func runStart(c *cobra.Command, args []string) error {
 		return err
 	}
 
+	cwd, _ := os.Getwd()
+	repoPath, repoBranch := gitinfo.Describe(cwd)
+
 	sessionID, err := database.CreateSession(model.Session{
 		TaskID:          taskID,
 		TaskName:        taskName,
@@ -65,6 +69,8 @@ func runStart(c *cobra.Command, args []string) error {
 		PlannedDuration: int(duration.Seconds()),
 		Status:          model.StatusRunning,
 		StartedAt:       time.Now(),
+		RepoPath:        repoPath,
+		RepoBranch:      repoBranch,
 	})
 	if err != nil {
 		return err

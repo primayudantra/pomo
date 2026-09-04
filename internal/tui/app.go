@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"pomo/internal/db"
+	"pomo/internal/gitinfo"
 	"pomo/internal/model"
 	"pomo/internal/pomoconfig"
 	"pomo/internal/report"
@@ -76,6 +78,8 @@ type App struct {
 
 	quitInput textinput.Model
 	quitErr   bool
+
+	startCwd string
 }
 
 const (
@@ -140,6 +144,8 @@ func NewApp(d *db.DB) *App {
 	qi.PromptStyle = styleAccent
 	qi.TextStyle = styleBright
 
+	cwd, _ := os.Getwd()
+
 	a := &App{
 		db:            d,
 		cfg:           cfg,
@@ -150,6 +156,7 @@ func NewApp(d *db.DB) *App {
 		durationInput: di,
 		noteInput:     note,
 		quitInput:     qi,
+		startCwd:      cwd,
 	}
 	return a
 }
@@ -424,6 +431,7 @@ func (a *App) updateDuration(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (a *App) beginSession(taskID int64, name, tag string, minutes int) (tea.Model, tea.Cmd) {
 	duration := time.Duration(minutes) * time.Minute
+	repoPath, repoBranch := gitinfo.Describe(a.startCwd)
 	sessionID, err := a.db.CreateSession(model.Session{
 		TaskID:          taskID,
 		TaskName:        name,
@@ -431,6 +439,8 @@ func (a *App) beginSession(taskID int64, name, tag string, minutes int) (tea.Mod
 		PlannedDuration: int(duration.Seconds()),
 		Status:          model.StatusRunning,
 		StartedAt:       time.Now(),
+		RepoPath:        repoPath,
+		RepoBranch:      repoBranch,
 	})
 	if err != nil {
 		a.err = err
