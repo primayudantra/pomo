@@ -20,4 +20,8 @@ Status: approved for planning (2026-09-04).
 - Chunk 1 (schema + `internal/report` + `pomo review`): **done** — `plans/2026-09-04-report-foundation.md`.
 - Chunk 2 (config keys + `internal/ipc` + `internal/ai`): **done** — `plans/2026-09-04-daemon-prep.md`.
 - Chunk 3 (daemon + `internal/watch` + drift scoring + `internal/nudge` + `internal/notify`): **done** — `plans/2026-09-04-drift-daemon.md`.
-- Chunk 4 (TUI slash palette + `/chat` + `pomo digest` + daemon wiring): not started.
+- Chunk 4 (TUI slash palette + `/chat` + `pomo digest` + daemon wiring): **done** — `plans/2026-09-04-tui-slash-surface.md`.
+
+ADHD focus layer complete. Deferred items (backlog, see the overview spec §3
+Non-goals): launchd/systemd unit, Linux foreground watching, browser-tab
+attribution under denied automation permission.

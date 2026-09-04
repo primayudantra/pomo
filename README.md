@@ -89,7 +89,13 @@ pomo history [filters]
 pomo review [window] [--json]
 pomo config [set KEY VALUE]
 pomo daemon start | stop | status
+pomo digest [--week YYYY-Www] [--notify]
 ```
+
+### In the dashboard
+
+Press `/` for the command palette: `/review`, `/insights`, `/drift`, `/chat`,
+`/settings`, `/start`, `/skip`, `/help`, `/quit`.
 
 ## Data
 
@@ -102,7 +108,7 @@ Everything lives in `~/.pomo/`:
 
 In progress. Design specs in [`specs/`](specs/), plans in [`plans/`](plans/).
 
-**Shipped:**
+Shipped in full:
 
 - **Drift detection daemon** (`pomo daemon start`) — a background process watches
   the foreground app (macOS) and repo file activity during a session and records
@@ -111,14 +117,17 @@ In progress. Design specs in [`specs/`](specs/), plans in [`plans/`](plans/).
   signals only.
 - **Gentle escalating nudges** — a desktop notification when you drift, escalating
   L1 → L3, phrased by your own AI key if configured (`ai.provider` = `anthropic`
-  or `openrouter`, BYOK), plain templates otherwise.
-- **`pomo review`** — focus vs plan, drift totals, per-tag breakdown, best hour.
+  or `openrouter`, BYOK), plain templates otherwise. Inside a running timer the
+  nudge shows as an overlay with `[b] break  [r] refocus  [d] drifted  [s] snooze`.
+- **Slash-command surface** — press `/` from the dashboard or a running timer:
+  `/review`, `/insights` (AI recap), `/drift`, `/chat` (a streamed focus coach —
+  input is validated, the system prompt is fixed), `/settings`, `/help`.
+- **Weekly digest** — `~/.pomo/reviews/YYYY-Www.md`, via `pomo digest` or written
+  automatically by the daemon on the first Monday tick.
 
-**Still to come:**
-
-- **Slash-command surface in the TUI** — `/review`, `/insights`, `/drift`,
-  `/chat` (streaming focus coach), instead of memorising subcommands.
-- **Weekly digest** — `~/.pomo/reviews/YYYY-Www.md`, written automatically.
+Backlog (deferred, not blocking): a launchd/systemd unit (the daemon currently
+runs as a detached process with a pidfile), Linux foreground-app watching, and
+browser-tab attribution when macOS automation permission is denied.
 
 ## Development
 

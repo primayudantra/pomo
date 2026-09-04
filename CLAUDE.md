@@ -12,6 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pomo daemon start|stop|status` — background drift-detection daemon (darwin
   foreground-app watching; other OS runs checkpoint + fs signals only).
   `pomo daemon run` is the foreground loop the detached process executes.
+- `pomo digest [--week YYYY-Www]` — write a week's review digest to
+  `~/.pomo/reviews/`. The daemon also writes last week's on the first Monday tick.
 
 Requires Go 1.25.
 
@@ -35,10 +37,15 @@ Local-first terminal Pomodoro tracker. Cobra CLI + Bubble Tea TUI. SQLite via
 - **`internal/pomoconfig`** — typed `Config` loaded from the `config` table with
   hardcoded `defaults()`; `pomo config set <key> <value>` writes string values back.
 - **`internal/tui`** — one persistent Bubble Tea `App` (`app.go`) drives ALL
-  interactive screens (dashboard, task select, timer, note, settings, stats) via a
-  `screen` enum. Design rule: screen transitions stay inside this one program so
-  skip/cancel/complete never drop the user back to the shell — only explicit quit
-  from the dashboard exits. `theme.go` = lipgloss styles.
+  interactive screens via a `screen` enum. Design rule: screen transitions stay
+  inside this one program so skip/cancel/complete never drop the user back to the
+  shell — only explicit quit from the dashboard exits. `theme.go` = lipgloss
+  styles. The slash surface lives in `commands.go` (registry + `guardChatInput`),
+  `prompt.go` (`screenPrompt` palette), `result.go` (`/review` `/drift`),
+  `insights.go` (`/insights` async recap), `chat.go` (`/chat` stream), and
+  `daemonlink.go` (IPC client → `● daemon up` indicator + checkpoint/nudge
+  overlays on the timer). Async work uses the channel + re-issued `tea.Cmd`
+  pattern; no `tea.Program` handle escapes.
 - **`internal/sound`** — 4 mp3 clips `//go:embed`-ed; playback shells out to a
   platform audio player (`afplay` on macOS) against a temp file.
 - **`internal/report`** — all windowed aggregation (sessions + `drift_events`) and
