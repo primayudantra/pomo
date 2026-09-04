@@ -93,11 +93,7 @@ func truncate(s string, n int) string {
 	return s[:n] + "…"
 }
 
-// --- temporary stubs, removed in Tasks 6 and 7 ---
-func (p *httpProvider) openrouterComplete(ctx context.Context, system, user string, maxTokens int) (string, error) {
-	return "", fmt.Errorf("openrouter: not implemented")
-}
-
+// --- temporary stub, removed in Task 7 ---
 func (p *httpProvider) Stream(ctx context.Context, system string, msgs []Msg, onDelta func(string)) error {
 	return fmt.Errorf("stream: not implemented")
 }
