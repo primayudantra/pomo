@@ -58,8 +58,14 @@ func Open() (*DB, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(dir, "pomo.db")
-	sqlDB, err := sql.Open("sqlite", path)
+	return OpenAt(filepath.Join(dir, "pomo.db"))
+}
+
+// OpenAt opens (creating if needed) a pomo database at an explicit path and
+// runs migrations. Open() is the normal entrypoint; OpenAt exists for tests
+// and tools that need a non-default location.
+func OpenAt(path string) (*DB, error) {
+	sqlDB, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, err
 	}
