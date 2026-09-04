@@ -92,8 +92,3 @@ func truncate(s string, n int) string {
 	}
 	return s[:n] + "…"
 }
-
-// --- temporary stub, removed in Task 7 ---
-func (p *httpProvider) Stream(ctx context.Context, system string, msgs []Msg, onDelta func(string)) error {
-	return fmt.Errorf("stream: not implemented")
-}
