@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -60,7 +62,12 @@ func (p *httpProvider) Stream(ctx context.Context, system string, msgs []Msg, on
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("%s: stream status %s", p.cfg.Provider, resp.Status)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 400))
+		msg := fmt.Sprintf("%s: %s: %s", p.cfg.Provider, resp.Status, strings.TrimSpace(string(body)))
+		if resp.StatusCode == 404 && p.cfg.Provider == "openrouter" {
+			msg += fmt.Sprintf("  (model %q not on OpenRouter — set a valid slug via ai.model, or switch provider to anthropic if your key is sk-ant-…)", p.cfg.Model)
+		}
+		return errors.New(msg)
 	}
 
 	sc := bufio.NewScanner(resp.Body)

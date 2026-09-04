@@ -34,7 +34,11 @@ func (p *httpProvider) openrouterComplete(ctx context.Context, system, user stri
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("openrouter: %s: %s", resp.Status, truncate(string(body), 200))
+		msg := fmt.Sprintf("openrouter: %s: %s", resp.Status, truncate(string(body), 200))
+		if resp.StatusCode == 404 {
+			msg += fmt.Sprintf("  (model %q not on OpenRouter — set a valid slug via ai.model, or use provider anthropic if your key is sk-ant-…)", p.cfg.Model)
+		}
+		return "", fmt.Errorf("%s", msg)
 	}
 	var out struct {
 		Choices []struct {

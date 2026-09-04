@@ -41,7 +41,7 @@ func TestOpenRouterLine(t *testing.T) {
 	if err := json.Unmarshal([]byte(gotBody), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Model != "anthropic/claude-3.5-haiku" || body.MaxTokens != 120 {
+	if body.Model != "anthropic/claude-haiku-4.5" || body.MaxTokens != 120 {
 		t.Fatalf("model/max = %q/%d", body.Model, body.MaxTokens)
 	}
 	if len(body.Messages) != 2 || body.Messages[0]["role"] != "system" {

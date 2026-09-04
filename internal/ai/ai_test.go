@@ -31,7 +31,7 @@ func TestDefaultModel(t *testing.T) {
 	if ai.DefaultModel("anthropic") != "claude-haiku-4-5" {
 		t.Errorf("anthropic default = %q", ai.DefaultModel("anthropic"))
 	}
-	if ai.DefaultModel("openrouter") != "anthropic/claude-3.5-haiku" {
+	if ai.DefaultModel("openrouter") != "anthropic/claude-haiku-4.5" {
 		t.Errorf("openrouter default = %q", ai.DefaultModel("openrouter"))
 	}
 }

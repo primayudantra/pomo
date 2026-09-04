@@ -63,7 +63,7 @@ func DefaultModel(provider string) string {
 	case "anthropic":
 		return "claude-haiku-4-5"
 	case "openrouter":
-		return "anthropic/claude-3.5-haiku"
+		return "anthropic/claude-haiku-4.5"
 	default:
 		return ""
 	}
