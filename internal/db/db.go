@@ -39,6 +39,19 @@ CREATE TABLE IF NOT EXISTS config (
 	key TEXT PRIMARY KEY,
 	value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS drift_events (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	session_id INTEGER NOT NULL,
+	started_at TIMESTAMP NOT NULL,
+	ended_at   TIMESTAMP,
+	seconds    INTEGER DEFAULT 0,
+	trigger    TEXT NOT NULL,
+	detail     TEXT DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_drift_session ON drift_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_drift_started ON drift_events(started_at);
 `
 
 type DB struct {

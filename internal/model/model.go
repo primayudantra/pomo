@@ -35,3 +35,13 @@ type Session struct {
 	RepoPath        string
 	RepoBranch      string
 }
+
+type DriftEvent struct {
+	ID        int64
+	SessionID int64
+	StartedAt time.Time
+	EndedAt   *time.Time
+	Seconds   int
+	Trigger   string // "foreground" | "fs_stale" | "checkpoint_no"
+	Detail    string
+}
