@@ -16,6 +16,7 @@ import (
 	"pomo/internal/ai"
 	"pomo/internal/db"
 	"pomo/internal/gitinfo"
+	"pomo/internal/ipc"
 	"pomo/internal/model"
 	"pomo/internal/pomoconfig"
 	"pomo/internal/report"
@@ -102,7 +103,11 @@ type App struct {
 	chatErr       string
 	chatCancel    func()
 
-	daemonUp bool
+	daemonUp         bool
+	ipcClient        *ipc.Client
+	daemonEvents     chan ipc.Event
+	nudgeOverlay     *nudgeOverlay
+	checkpointActive bool
 }
 
 const (
@@ -197,6 +202,7 @@ func NewApp(d *db.DB) *App {
 		chatInput:     ci,
 		result:        viewport.New(80, 20),
 		chat:          viewport.New(80, 20),
+		daemonEvents:  make(chan ipc.Event, 16),
 	}
 	return a
 }
@@ -204,8 +210,10 @@ func NewApp(d *db.DB) *App {
 // RunApp starts the persistent interactive dashboard.
 func RunApp(d *db.DB) error {
 	a := NewApp(d)
+	a.connectDaemon()
 	p := tea.NewProgram(a, tea.WithAltScreen())
 	_, err := p.Run()
+	a.closeDaemon()
 	return err
 }
 
@@ -213,15 +221,17 @@ func RunApp(d *db.DB) error {
 // arrow-key task picker, for `pomo start` invoked with no task argument.
 func RunAppTaskSelect(d *db.DB) error {
 	a := NewApp(d)
+	a.connectDaemon()
 	a.loadTaskList()
 	a.screen = screenTaskSelect
 	p := tea.NewProgram(a, tea.WithAltScreen())
 	_, err := p.Run()
+	a.closeDaemon()
 	return err
 }
 
 func (a *App) Init() tea.Cmd {
-	return dashTick()
+	return tea.Batch(dashTick(), a.waitDaemonEvent())
 }
 
 func (a *App) loadTaskList() {
@@ -254,6 +264,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if cd, ok := msg.(chatDeltaMsg); ok {
 		return a, a.handleChatDelta(cd)
+	}
+
+	if dm, ok := msg.(daemonEventMsg); ok {
+		return a, a.handleDaemonEvent(dm.e)
 	}
 
 	switch a.screen {
@@ -558,6 +572,32 @@ func (a *App) playFinishSound() {
 }
 
 func (a *App) updateTimer(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if km, ok := msg.(tea.KeyMsg); ok {
+		if a.checkpointActive {
+			switch km.String() {
+			case "y", "n":
+				a.sendDaemon(ipc.Event{Type: "checkpoint-answer", Answer: km.String()})
+				a.checkpointActive = false
+				return a, nil
+			}
+		}
+		if a.nudgeOverlay != nil {
+			switch km.String() {
+			case "d", "r", "s", "esc":
+				action := km.String()
+				if action == "s" || action == "esc" {
+					action = "snooze"
+				}
+				a.sendDaemon(ipc.Event{Type: "nudge-action", Action: action})
+				a.nudgeOverlay = nil
+				return a, nil
+			case "b":
+				a.sendDaemon(ipc.Event{Type: "nudge-action", Action: "b"})
+				a.nudgeOverlay = nil
+				// fall through to the timer's own break/skip handling
+			}
+		}
+	}
 	if km, ok := msg.(tea.KeyMsg); ok && km.String() == "/" {
 		return a.enterPrompt(screenTimer)
 	}
@@ -661,6 +701,13 @@ func (a *App) View() string {
 		if a.muted {
 			content += "\n" + styleMuted.Render("🔇 muted")
 		}
+		if a.checkpointActive {
+			content += "\n\n" + styleAccent.Render("on task?  [y]  [n]")
+		}
+		if a.nudgeOverlay != nil {
+			content += "\n\n" + styleAccent.Render(a.nudgeOverlay.text) +
+				"\n" + dimHelp("[b] break  [r] refocus  [d] drifted  [s] snooze")
+		}
 	case screenSettings:
 		content = a.settingsView()
 	case screenStats:
@@ -685,6 +732,7 @@ func (a *App) View() string {
 		content = a.viewChat()
 	default:
 		view := a.dash.View()
+		view += "\n" + a.daemonIndicator()
 		if a.flash != "" {
 			view += "\n\n" + lipgloss.NewStyle().Foreground(a.flashColor).Render(a.flash)
 		}
