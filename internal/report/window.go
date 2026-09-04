@@ -29,13 +29,15 @@ func Today() Window {
 }
 
 // ThisWeek is the current ISO week (Monday start), local time.
-func ThisWeek() Window {
-	now := time.Now()
-	wd := int(now.Weekday())
+func ThisWeek() Window { return WeekAt(time.Now()) }
+
+// WeekAt is the ISO week (Monday start, local time) containing t.
+func WeekAt(t time.Time) Window {
+	wd := int(t.Weekday())
 	if wd == 0 {
 		wd = 7
 	}
-	from := midnight(now).AddDate(0, 0, -(wd - 1))
+	from := midnight(t).AddDate(0, 0, -(wd - 1))
 	y, w := from.ISOWeek()
 	return Window{From: from, To: from.AddDate(0, 0, 7), Label: fmt.Sprintf("%d-W%02d", y, w)}
 }

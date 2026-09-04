@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -21,6 +22,7 @@ import (
 	"pomo/internal/notify"
 	"pomo/internal/nudge"
 	"pomo/internal/pomoconfig"
+	"pomo/internal/report"
 	"pomo/internal/watch"
 )
 
@@ -33,15 +35,17 @@ type Deps struct {
 	Notify notify.Notifier
 	IPC    Broadcaster
 	AI     ai.Nudger
+	Recap  ai.Recapper // optional; nil skips the AI recap in the weekly digest
 	Cfg    pomoconfig.Config
 	Now    func() time.Time
 }
 
 type Loop struct {
-	d         Deps
-	active    *sessionState
-	startedAt time.Time
-	lastTick  time.Time
+	d               Deps
+	active          *sessionState
+	startedAt       time.Time
+	lastTick        time.Time
+	lastDigestCheck string // "2006-01-02" of the last maybeWeeklyDigest run
 }
 
 type sessionState struct {
@@ -99,6 +103,7 @@ func (l *Loop) Tick() {
 			l.closeEpisode(now)
 		}
 		l.active = nil
+		l.maybeWeeklyDigest(now)
 		l.d.IPC.Broadcast(ipc.Event{Type: "idle"})
 		return
 	}
@@ -265,6 +270,52 @@ func (l *Loop) HandleEvent(e ipc.Event) {
 			a.nudge.Snooze(now)
 		}
 	}
+}
+
+// maybeWeeklyDigest writes last week's digest file once, on a Monday, if it is
+// missing. Guarded so it runs at most once per calendar day.
+func (l *Loop) maybeWeeklyDigest(now time.Time) {
+	today := now.Format("2006-01-02")
+	if l.lastDigestCheck == today {
+		return
+	}
+	l.lastDigestCheck = today
+	if now.Weekday() != time.Monday {
+		return
+	}
+	lastWeek := report.WeekAt(now.AddDate(0, 0, -7))
+	if _, err := os.Stat(report.WeeklyDigestPath(lastWeek.Label)); err == nil {
+		return
+	}
+	recap := ""
+	if l.d.Recap != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		if sum, e := report.Build(l.d.DB, lastWeek); e == nil {
+			if text, re := l.d.Recap.Recap(ctx, recapCtx(sum)); re == nil {
+				recap = text
+			}
+		}
+		cancel()
+	}
+	if _, err := report.WriteWeeklyDigest(l.d.DB, lastWeek, recap); err != nil {
+		log.Println("daemon: weekly digest:", err)
+		return
+	}
+	if l.d.Cfg.Digest.Notify {
+		_ = l.d.Notify.Send("pomo weekly digest", report.WeeklyDigestPath(lastWeek.Label))
+	}
+}
+
+func recapCtx(sum report.Summary) ai.RecapContext {
+	rc := ai.RecapContext{
+		Label: sum.Window.Label, FocusMinutes: sum.FocusSeconds / 60,
+		PlannedMinutes: sum.PlannedSeconds / 60, Completed: sum.Completed,
+		Planned: sum.Planned, DriftMinutes: sum.DriftSeconds / 60,
+	}
+	if sum.BestHour != nil {
+		rc.BestHour = fmt.Sprintf("%02d:00", sum.BestHour.Hour)
+	}
+	return rc
 }
 
 // StatusSnapshot is written to ~/.pomo/daemon.status by the run command.

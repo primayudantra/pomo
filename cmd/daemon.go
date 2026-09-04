@@ -179,12 +179,16 @@ func runDaemon(c *cobra.Command, args []string) error {
 	}
 	defer srv.Close()
 
+	nudger, recapper, _ := ai.New(ai.Config{
+		Provider: cfg.AI.Provider, Key: cfg.AI.Key, Model: cfg.AI.Model,
+	})
 	loop = daemon.NewLoop(daemon.Deps{
 		DB:     database,
 		Watch:  watch.New(),
 		Notify: notify.New(),
 		IPC:    srv,
-		AI:     newAINudger(cfg),
+		AI:     nudger,
+		Recap:  recapper,
 		Cfg:    cfg,
 	})
 
@@ -209,11 +213,3 @@ func runDaemon(c *cobra.Command, args []string) error {
 	}
 }
 
-func newAINudger(cfg pomoconfig.Config) ai.Nudger {
-	n, _, _ := ai.New(ai.Config{
-		Provider: cfg.AI.Provider,
-		Key:      cfg.AI.Key,
-		Model:    cfg.AI.Model,
-	})
-	return n
-}
