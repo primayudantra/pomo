@@ -32,4 +32,6 @@ type Session struct {
 	StartedAt       time.Time
 	CompletedAt     *time.Time
 	CreatedAt       time.Time
+	RepoPath        string
+	RepoBranch      string
 }

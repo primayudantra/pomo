@@ -72,7 +72,44 @@ func OpenAt(path string) (*DB, error) {
 	if _, err := sqlDB.Exec(schema); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
+	for _, c := range []struct{ table, col, ddl string }{
+		{"sessions", "repo_path", "repo_path TEXT DEFAULT ''"},
+		{"sessions", "repo_branch", "repo_branch TEXT DEFAULT ''"},
+	} {
+		if err := ensureColumn(sqlDB, c.table, c.col, c.ddl); err != nil {
+			return nil, fmt.Errorf("migrate %s.%s: %w", c.table, c.col, err)
+		}
+	}
 	return &DB{sqlDB}, nil
+}
+
+// ensureColumn adds a column if the table does not already have it. SQLite's
+// ALTER TABLE ADD COLUMN errors when the column exists, so this is how we do
+// additive migrations on top of the CREATE TABLE IF NOT EXISTS schema.
+func ensureColumn(sqlDB *sql.DB, table, col, ddl string) error {
+	rows, err := sqlDB.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			cid, notnull, pk int
+			name, ctype      string
+			dflt             sql.NullString
+		)
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == col {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = sqlDB.Exec("ALTER TABLE " + table + " ADD COLUMN " + ddl)
+	return err
 }
 
 // --- Tasks ---
@@ -156,9 +193,9 @@ func (d *DB) FindOrCreateTask(name, tag string) (int64, error) {
 
 func (d *DB) CreateSession(s model.Session) (int64, error) {
 	res, err := d.Exec(`INSERT INTO sessions
-		(task_id, task_name, tag, planned_duration, actual_duration, status, note, started_at, created_at)
-		VALUES (?, ?, ?, ?, 0, ?, '', ?, ?)`,
-		s.TaskID, s.TaskName, s.Tag, s.PlannedDuration, s.Status, s.StartedAt, time.Now())
+		(task_id, task_name, tag, planned_duration, actual_duration, status, note, started_at, created_at, repo_path, repo_branch)
+		VALUES (?, ?, ?, ?, 0, ?, '', ?, ?, ?, ?)`,
+		s.TaskID, s.TaskName, s.Tag, s.PlannedDuration, s.Status, s.StartedAt, time.Now(), s.RepoPath, s.RepoBranch)
 	if err != nil {
 		return 0, err
 	}
@@ -188,7 +225,7 @@ func (d *DB) FinishSession(id int64, status model.SessionStatus, actualDuration 
 }
 
 func (d *DB) LastRunningSession() (*model.Session, error) {
-	row := d.QueryRow(`SELECT id, task_id, task_name, tag, planned_duration, actual_duration, status, note, started_at, completed_at, created_at
+	row := d.QueryRow(`SELECT id, task_id, task_name, tag, planned_duration, actual_duration, status, note, started_at, completed_at, created_at, repo_path, repo_branch
 		FROM sessions WHERE status = 'running' ORDER BY id DESC LIMIT 1`)
 	return scanSession(row)
 }
@@ -197,7 +234,7 @@ func scanSession(row *sql.Row) (*model.Session, error) {
 	var s model.Session
 	var completedAt sql.NullTime
 	if err := row.Scan(&s.ID, &s.TaskID, &s.TaskName, &s.Tag, &s.PlannedDuration, &s.ActualDuration,
-		&s.Status, &s.Note, &s.StartedAt, &completedAt, &s.CreatedAt); err != nil {
+		&s.Status, &s.Note, &s.StartedAt, &completedAt, &s.CreatedAt, &s.RepoPath, &s.RepoBranch); err != nil {
 		return nil, err
 	}
 	if completedAt.Valid {
@@ -214,7 +251,7 @@ type SessionFilter struct {
 }
 
 func (d *DB) ListSessions(f SessionFilter) ([]model.Session, error) {
-	q := `SELECT id, task_id, task_name, tag, planned_duration, actual_duration, status, note, started_at, completed_at, created_at
+	q := `SELECT id, task_id, task_name, tag, planned_duration, actual_duration, status, note, started_at, completed_at, created_at, repo_path, repo_branch
 		FROM sessions WHERE 1=1`
 	var args []interface{}
 	if f.From != nil {
@@ -245,7 +282,7 @@ func (d *DB) ListSessions(f SessionFilter) ([]model.Session, error) {
 		var s model.Session
 		var completedAt sql.NullTime
 		if err := rows.Scan(&s.ID, &s.TaskID, &s.TaskName, &s.Tag, &s.PlannedDuration, &s.ActualDuration,
-			&s.Status, &s.Note, &s.StartedAt, &completedAt, &s.CreatedAt); err != nil {
+			&s.Status, &s.Note, &s.StartedAt, &completedAt, &s.CreatedAt, &s.RepoPath, &s.RepoBranch); err != nil {
 			return nil, err
 		}
 		if completedAt.Valid {
