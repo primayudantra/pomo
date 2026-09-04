@@ -13,4 +13,11 @@ Read in this order:
 6. [`2026-09-04-schema-config-migration.md`](2026-09-04-schema-config-migration.md) — schema deltas, config keys, SQLite concurrency, backward compat.
 7. [`2026-09-04-testing.md`](2026-09-04-testing.md) — first tests for the repo, `make test`, manual checklist.
 
-Status: approved for planning (2026-09-04). Next step: implementation plan.
+Status: approved for planning (2026-09-04).
+
+## Progress
+
+- Chunk 1 (schema + `internal/report` + `pomo review`): **done** — `plans/2026-09-04-report-foundation.md`.
+- Chunk 2 (config keys + `internal/ipc` + `internal/ai`): **done** — `plans/2026-09-04-daemon-prep.md`.
+- Chunk 3 (daemon + `internal/watch` + drift scoring + `internal/nudge` + `internal/notify`): not started.
+- Chunk 4 (TUI slash palette + `/chat` + `pomo digest` + daemon wiring): not started.

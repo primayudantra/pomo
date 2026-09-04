@@ -42,6 +42,12 @@ Local-first terminal Pomodoro tracker. Cobra CLI + Bubble Tea TUI. SQLite via
   rendering (text / markdown / JSON). Shared by `pomo review`, the TUI stats
   screen, and (later) the daemon's weekly digest. Day-bucket and streak helpers
   live here, not in `internal/tui`.
+- **`internal/ipc`** — newline-delimited-JSON Unix-domain-socket channel
+  (`~/.pomo/daemon.sock`) between the planned daemon (server, fan-out
+  `Broadcast`) and the TUI (client). Not yet wired to anything.
+- **`internal/ai`** — BYOK provider layer (`anthropic` | `openrouter`, raw
+  `net/http`) behind `Nudger` / `Recapper` / `Chatter`. Empty provider →
+  no-op returning `ErrNoProvider`. Not yet wired to anything.
 
 ## Conventions
 
@@ -57,3 +63,7 @@ Local-first terminal Pomodoro tracker. Cobra CLI + Bubble Tea TUI. SQLite via
 - Additive schema changes: new tables via the `schema` const
   (`CREATE TABLE IF NOT EXISTS`); new columns via `ensureColumn` in `OpenAt`
   (SQLite `ALTER TABLE ADD COLUMN` is not idempotent).
+- Config keys are grouped (`drift.*`, `nudge.*`, `ai.*`, `daemon.*`, `digest.*`);
+  `pomoconfig.Load` parses them in one pass, bad values fall back to the default.
+  `pomo config set` validates against `configKeys` in `cmd/config.go`. `ai.key` is
+  masked (`pomoconfig.MaskKey`) wherever shown.
