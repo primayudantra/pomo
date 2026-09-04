@@ -88,6 +88,7 @@ pomo today | week | month | stats
 pomo history [filters]
 pomo review [window] [--json]
 pomo config [set KEY VALUE]
+pomo daemon start | stop | status
 ```
 
 ## Data
@@ -101,19 +102,23 @@ Everything lives in `~/.pomo/`:
 
 In progress. Design specs in [`specs/`](specs/), plans in [`plans/`](plans/).
 
-- **Drift detection daemon** — a background `pomo daemon` watches the foreground
-  app + file activity during a session and records drift episodes when you slip
-  onto Chrome / Slack / YouTube.
-- **Gentle escalating nudges** — a desktop notification when you drift, phrased by
-  your own AI key if configured (Anthropic or OpenRouter, BYOK), plain templates
-  otherwise.
+**Shipped:**
+
+- **Drift detection daemon** (`pomo daemon start`) — a background process watches
+  the foreground app (macOS) and repo file activity during a session and records
+  drift episodes when you slip onto Chrome / Slack / YouTube. `pomo daemon status`
+  shows what it's doing. On non-macOS it runs the checkpoint + file-activity
+  signals only.
+- **Gentle escalating nudges** — a desktop notification when you drift, escalating
+  L1 → L3, phrased by your own AI key if configured (`ai.provider` = `anthropic`
+  or `openrouter`, BYOK), plain templates otherwise.
+- **`pomo review`** — focus vs plan, drift totals, per-tag breakdown, best hour.
+
+**Still to come:**
+
 - **Slash-command surface in the TUI** — `/review`, `/insights`, `/drift`,
   `/chat` (streaming focus coach), instead of memorising subcommands.
 - **Weekly digest** — `~/.pomo/reviews/YYYY-Www.md`, written automatically.
-
-Shipped so far: the `drift_events` schema, the `internal/report` aggregation used
-by `pomo review`, the config surface, and the `internal/ipc` + `internal/ai`
-building blocks.
 
 ## Development
 

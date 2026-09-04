@@ -19,5 +19,5 @@ Status: approved for planning (2026-09-04).
 
 - Chunk 1 (schema + `internal/report` + `pomo review`): **done** — `plans/2026-09-04-report-foundation.md`.
 - Chunk 2 (config keys + `internal/ipc` + `internal/ai`): **done** — `plans/2026-09-04-daemon-prep.md`.
-- Chunk 3 (daemon + `internal/watch` + drift scoring + `internal/nudge` + `internal/notify`): not started.
+- Chunk 3 (daemon + `internal/watch` + drift scoring + `internal/nudge` + `internal/notify`): **done** — `plans/2026-09-04-drift-daemon.md`.
 - Chunk 4 (TUI slash palette + `/chat` + `pomo digest` + daemon wiring): not started.

@@ -9,6 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `go run .` — run without installing
 - `make test` / `go test ./...` — test suite (add `-run TestName ./pkg/` for one test)
 - `go vet ./...` — static checks
+- `pomo daemon start|stop|status` — background drift-detection daemon (darwin
+  foreground-app watching; other OS runs checkpoint + fs signals only).
+  `pomo daemon run` is the foreground loop the detached process executes.
 
 Requires Go 1.25.
 
@@ -47,7 +50,26 @@ Local-first terminal Pomodoro tracker. Cobra CLI + Bubble Tea TUI. SQLite via
   `Broadcast`) and the TUI (client). Not yet wired to anything.
 - **`internal/ai`** — BYOK provider layer (`anthropic` | `openrouter`, raw
   `net/http`) behind `Nudger` / `Recapper` / `Chatter`. Empty provider →
-  no-op returning `ErrNoProvider`. Not yet wired to anything.
+  no-op returning `ErrNoProvider`. `Nudger` is wired to the daemon; `Recapper`
+  / `Chatter` await the TUI slash surface.
+- **`internal/gitinfo`** — `git rev-parse` wrapper; `pomo start` and the TUI
+  stamp `sessions.repo_path` / `repo_branch` from the cwd at launch.
+- **`internal/watch`** — foreground-app reader (darwin: `osascript` via System
+  Events; `!darwin`: stub), `Classify` (focus/neutral/distract vs the config
+  app lists), and `RepoActive` (bounded early-exit `WalkDir` for fs staleness —
+  no `fsnotify` dependency).
+- **`internal/drift`** — pure per-tick scorer: `State.Step(now, Signals, cfg)
+  -> Result{Drifting, Trigger, Detail}`. No I/O.
+- **`internal/nudge`** — pure escalation state machine (L1–L3, min-gap,
+  max-per-session, checkpoint-reset); AI line with canned fallback and de-dup.
+- **`internal/notify`** — fire-and-forget desktop notifications
+  (`terminal-notifier` / `osascript` / `notify-send`), never a blocking dialog,
+  no-op when no binary is present.
+- **`internal/daemon`** — the `Loop`. One `Tick()` gathers signals, scores
+  drift, writes/updates/closes `drift_events` episodes, and fires nudges over
+  `notify` + `ipc`. Fully unit-tested with fakes and an injected clock;
+  `cmd/daemon.go` is the thin sleep-loop + pidfile/flock wrapper around it
+  (detached process + `~/.pomo/daemon.pid`, no launchd/systemd unit yet).
 
 ## Conventions
 
