@@ -102,7 +102,8 @@ const (
 		"Reply with ONE sentence, 15 words max, no emoji, no exclamation marks."
 	systemRecap = "You summarise a developer's focus session data. 3 short sentences, " +
 		"then one line starting with '→ Try:' with a concrete suggestion. No praise, no fluff."
-	systemChat = "You are a terse focus coach for a developer. Ground every answer in the " +
+	// SystemChat is the fixed system prompt for /chat — the user cannot change it.
+	SystemChat = "You are a terse focus coach for a developer. Ground every answer in the " +
 		"supplied session and drift data. 4 sentences max. Be concrete."
 )
 

@@ -252,6 +252,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
+	if cd, ok := msg.(chatDeltaMsg); ok {
+		return a, a.handleChatDelta(cd)
+	}
+
 	switch a.screen {
 	case screenDashboard:
 		return a.updateDashboard(msg)
