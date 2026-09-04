@@ -80,8 +80,10 @@ type App struct {
 	pendingSession int64
 	durationOrigin screen
 
-	settingsCursor int
-	statsPeriod    int
+	settingsCursor  int
+	settingsEdit    textinput.Model
+	settingsEditing bool
+	statsPeriod     int
 
 	quitInput textinput.Model
 	quitErr   bool
@@ -118,6 +120,8 @@ const (
 	settingRowCheckpoint
 	settingRowNudges
 	settingRowAIProvider
+	settingRowAIKey
+	settingRowAIModel
 	settingRowCount
 )
 
@@ -190,6 +194,12 @@ func NewApp(d *db.DB) *App {
 	ci.PromptStyle = styleAccent
 	ci.TextStyle = styleBright
 
+	se := textinput.New()
+	se.CharLimit = 200
+	se.Width = 44
+	se.PromptStyle = styleAccent
+	se.TextStyle = styleBright
+
 	cwd, _ := os.Getwd()
 
 	a := &App{
@@ -205,6 +215,7 @@ func NewApp(d *db.DB) *App {
 		startCwd:      cwd,
 		promptInput:   pi,
 		chatInput:     ci,
+		settingsEdit:  se,
 		result:        viewport.New(80, 20),
 		chat:          viewport.New(80, 20),
 		daemonEvents:  make(chan ipc.Event, 16),
@@ -413,6 +424,9 @@ func (a *App) updateStats(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if a.settingsEditing {
+		return a.updateSettingsEdit(msg)
+	}
 	km, ok := msg.(tea.KeyMsg)
 	if !ok {
 		return a, nil
@@ -467,9 +481,58 @@ func (a *App) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			next := map[string]string{"": "anthropic", "anthropic": "openrouter", "openrouter": ""}
 			a.cfg.AI.Provider = next[a.cfg.AI.Provider]
 			_ = a.db.SetConfig("ai.provider", a.cfg.AI.Provider)
+		case settingRowAIKey:
+			if km.String() == "enter" {
+				a.beginSettingsEdit(a.cfg.AI.Key, true)
+				return a, textinput.Blink
+			}
+		case settingRowAIModel:
+			if km.String() == "enter" {
+				a.beginSettingsEdit(a.cfg.AI.Model, false)
+				return a, textinput.Blink
+			}
 		}
 	}
 	return a, nil
+}
+
+func (a *App) beginSettingsEdit(current string, secret bool) {
+	a.settingsEditing = true
+	a.settingsEdit.SetValue(current)
+	a.settingsEdit.CursorEnd()
+	if secret {
+		a.settingsEdit.EchoMode = textinput.EchoPassword
+	} else {
+		a.settingsEdit.EchoMode = textinput.EchoNormal
+	}
+	a.settingsEdit.Focus()
+}
+
+func (a *App) updateSettingsEdit(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if km, ok := msg.(tea.KeyMsg); ok {
+		switch km.String() {
+		case "esc":
+			a.settingsEditing = false
+			a.settingsEdit.Blur()
+			return a, nil
+		case "enter":
+			v := strings.TrimSpace(a.settingsEdit.Value())
+			switch a.settingsCursor {
+			case settingRowAIKey:
+				a.cfg.AI.Key = v
+				_ = a.db.SetConfig("ai.key", v)
+			case settingRowAIModel:
+				a.cfg.AI.Model = v
+				_ = a.db.SetConfig("ai.model", v)
+			}
+			a.settingsEditing = false
+			a.settingsEdit.Blur()
+			return a, nil
+		}
+	}
+	var cmd tea.Cmd
+	a.settingsEdit, cmd = a.settingsEdit.Update(msg)
+	return a, cmd
 }
 
 func (a *App) updateTaskSelect(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -865,11 +928,36 @@ func (a *App) settingsView() string {
 	}
 	b.WriteString(cursor(settingRowAIProvider) + label.Render("AI Provider") +
 		rowStyle(a.settingsCursor == settingRowAIProvider).Render(provVal))
+	b.WriteString("\n")
+
+	keyVal := pomoconfig.MaskKey(a.cfg.AI.Key)
+	if a.settingsEditing && a.settingsCursor == settingRowAIKey {
+		keyVal = a.settingsEdit.View()
+	}
+	b.WriteString(cursor(settingRowAIKey) + label.Render("AI Key") +
+		rowStyle(a.settingsCursor == settingRowAIKey).Render(keyVal))
+	b.WriteString("\n")
+
+	modelVal := a.cfg.AI.Model
+	if modelVal == "" {
+		modelVal = "(provider default)"
+	}
+	if a.settingsEditing && a.settingsCursor == settingRowAIModel {
+		modelVal = a.settingsEdit.View()
+	}
+	b.WriteString(cursor(settingRowAIModel) + label.Render("AI Model") +
+		rowStyle(a.settingsCursor == settingRowAIModel).Render(modelVal))
 	b.WriteString("\n\n")
-	b.WriteString(styleDim.Render("AI key: " + pomoconfig.MaskKey(a.cfg.AI.Key) +
-		"   (set with: pomo config set ai.key …)"))
-	b.WriteString("\n\n")
-	b.WriteString(dimHelp("↑/↓ move   enter/←/→ change   esc back"))
+
+	if a.cfg.AI.Provider != "" {
+		b.WriteString(styleDim.Render("key stored locally in ~/.pomo/pomo.db (never committed)"))
+		b.WriteString("\n\n")
+	}
+	if a.settingsEditing {
+		b.WriteString(dimHelp("enter save   esc cancel"))
+	} else {
+		b.WriteString(dimHelp("↑/↓ move   enter/←/→ change   enter edit (key/model)   esc back"))
+	}
 	return b.String()
 }
 

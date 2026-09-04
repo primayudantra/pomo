@@ -98,4 +98,7 @@ Local-first terminal Pomodoro tracker. Cobra CLI + Bubble Tea TUI. SQLite via
 - Config keys are grouped (`drift.*`, `nudge.*`, `ai.*`, `daemon.*`, `digest.*`);
   `pomoconfig.Load` parses them in one pass, bad values fall back to the default.
   `pomo config set` validates against `configKeys` in `cmd/config.go`. `ai.key` is
-  masked (`pomoconfig.MaskKey`) wherever shown.
+  masked (`pomoconfig.MaskKey`) wherever shown; it can also be entered in
+  `/settings` (masked `textinput`, `settingRowAIKey`). It lives in the `config`
+  table of `~/.pomo/pomo.db` in plaintext — `*.db` and `.pomo/` are gitignored;
+  never commit the database.

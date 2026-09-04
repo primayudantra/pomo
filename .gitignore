@@ -1,5 +1,15 @@
+# build output
 /pomo
+
+# local state — the pomo database holds your AI API key in plaintext.
+# NEVER commit it.
 *.db
 *.db-wal
 *.db-shm
+.pomo/
+daemon.pid
+daemon.lock
+daemon.status
+daemon.log
+
 .DS_Store
