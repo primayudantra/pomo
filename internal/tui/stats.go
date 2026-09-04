@@ -2,103 +2,13 @@ package tui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
-	"pomo/internal/db"
-	"pomo/internal/model"
+	"pomo/internal/report"
 )
-
-// dayStat aggregates one calendar day's finished-session activity.
-type dayStat struct {
-	Secs     int
-	Sessions int
-}
-
-func dayKey(t time.Time) string { return t.Format("2006-01-02") }
-
-// loadDayStats buckets every non-running session into its calendar day.
-// The dataset is a single user's Pomodoro history, small enough to scan
-// in full on every render of the analytics screen.
-func loadDayStats(d *db.DB) map[string]dayStat {
-	sessions, _ := d.ListSessions(db.SessionFilter{})
-	stats := map[string]dayStat{}
-	for _, s := range sessions {
-		if s.Status == model.StatusRunning {
-			continue
-		}
-		key := dayKey(s.StartedAt)
-		ds := stats[key]
-		ds.Secs += s.ActualDuration
-		ds.Sessions++
-		stats[key] = ds
-	}
-	return stats
-}
-
-// computeStreaks returns the current consecutive-active-day streak (today
-// counts if it has activity yet, otherwise the streak can still be "alive"
-// through yesterday) and the longest streak ever recorded.
-func computeStreaks(stats map[string]dayStat) (current, longest int) {
-	dates := make([]time.Time, 0, len(stats))
-	for k, v := range stats {
-		if v.Secs <= 0 {
-			continue
-		}
-		if t, err := time.ParseInLocation("2006-01-02", k, time.Local); err == nil {
-			dates = append(dates, t)
-		}
-	}
-	if len(dates) == 0 {
-		return 0, 0
-	}
-	sort.Slice(dates, func(i, j int) bool { return dates[i].Before(dates[j]) })
-
-	longest, run := 1, 1
-	for i := 1; i < len(dates); i++ {
-		if dates[i].Sub(dates[i-1]).Hours() == 24 {
-			run++
-		} else {
-			run = 1
-		}
-		if run > longest {
-			longest = run
-		}
-	}
-
-	now := time.Now()
-	cursor := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	if stats[dayKey(cursor)].Secs <= 0 {
-		cursor = cursor.AddDate(0, 0, -1)
-		if stats[dayKey(cursor)].Secs <= 0 {
-			return 0, longest
-		}
-	}
-	for stats[dayKey(cursor)].Secs > 0 {
-		current++
-		cursor = cursor.AddDate(0, 0, -1)
-	}
-	return current, longest
-}
-
-// mostActiveDay returns the label and seconds of the single best day on
-// record.
-func mostActiveDay(stats map[string]dayStat) (string, int) {
-	best, bestSecs := "-", 0
-	for k, v := range stats {
-		if v.Secs > bestSecs {
-			t, err := time.ParseInLocation("2006-01-02", k, time.Local)
-			if err != nil {
-				continue
-			}
-			best, bestSecs = t.Format("Jan 02"), v.Secs
-		}
-	}
-	return best, bestSecs
-}
 
 // heatCell renders one calendar-day cell: a dim dot when idle, else a
 // square shaded from the accent color by how the day compares to the
@@ -126,7 +36,7 @@ func heatLegend() string {
 
 // renderHeatmap draws a GitHub-style contribution grid: weeks as columns
 // (Monday-start), the last `weeks` of them, ending on the current week.
-func renderHeatmap(stats map[string]dayStat, weeks int) string {
+func renderHeatmap(stats map[string]report.DayStat, weeks int) string {
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	wd := int(today.Weekday())
@@ -142,7 +52,7 @@ func renderHeatmap(stats map[string]dayStat, weeks int) string {
 		if d.After(today) {
 			break
 		}
-		if s := stats[dayKey(d)].Secs; s > max {
+		if s := stats[report.DayKey(d)].Secs; s > max {
 			max = s
 		}
 	}
@@ -172,7 +82,7 @@ func renderHeatmap(stats map[string]dayStat, weeks int) string {
 				b.WriteString("  ")
 				continue
 			}
-			b.WriteString(heatCell(stats[dayKey(d)].Secs, max) + " ")
+			b.WriteString(heatCell(stats[report.DayKey(d)].Secs, max) + " ")
 		}
 		b.WriteString("\n")
 	}
@@ -180,14 +90,14 @@ func renderHeatmap(stats map[string]dayStat, weeks int) string {
 }
 
 // breakdownDays renders a bar per calendar day for the last n days.
-func breakdownDays(stats map[string]dayStat, n, width int) string {
+func breakdownDays(stats map[string]report.DayStat, n, width int) string {
 	now := time.Now()
 	secs := make([]int, n)
 	labels := make([]string, n)
 	max := 1
 	for i := 0; i < n; i++ {
 		d := now.AddDate(0, 0, -(n - 1 - i))
-		secs[i] = stats[dayKey(d)].Secs
+		secs[i] = stats[report.DayKey(d)].Secs
 		labels[i] = d.Format("Mon 02")
 		if secs[i] > max {
 			max = secs[i]
@@ -202,7 +112,7 @@ func breakdownDays(stats map[string]dayStat, n, width int) string {
 }
 
 // breakdownWeeks renders a bar per Monday-start week for the last n weeks.
-func breakdownWeeks(stats map[string]dayStat, n, width int) string {
+func breakdownWeeks(stats map[string]report.DayStat, n, width int) string {
 	now := time.Now()
 	wd := int(now.Weekday())
 	if wd == 0 {
@@ -217,7 +127,7 @@ func breakdownWeeks(stats map[string]dayStat, n, width int) string {
 		start := thisMonday.AddDate(0, 0, -7*(n-1-i))
 		total := 0
 		for d := 0; d < 7; d++ {
-			total += stats[dayKey(start.AddDate(0, 0, d))].Secs
+			total += stats[report.DayKey(start.AddDate(0, 0, d))].Secs
 		}
 		secs[i] = total
 		labels[i] = start.Format("Jan 02")
@@ -234,7 +144,7 @@ func breakdownWeeks(stats map[string]dayStat, n, width int) string {
 }
 
 // breakdownMonths renders a bar per calendar month for the last n months.
-func breakdownMonths(stats map[string]dayStat, n, width int) string {
+func breakdownMonths(stats map[string]report.DayStat, n, width int) string {
 	totals := map[string]int{}
 	for k, v := range stats {
 		t, err := time.ParseInLocation("2006-01-02", k, time.Local)

@@ -14,6 +14,7 @@ import (
 	"pomo/internal/db"
 	"pomo/internal/model"
 	"pomo/internal/pomoconfig"
+	"pomo/internal/report"
 	"pomo/internal/sound"
 )
 
@@ -664,7 +665,7 @@ func (a *App) settingsView() string {
 }
 
 func (a *App) statsView() string {
-	stats := loadDayStats(a.db)
+	stats := report.LoadDayStats(a.db)
 
 	width := a.width
 	if width == 0 {
@@ -690,8 +691,8 @@ func (a *App) statsView() string {
 		totalFocus += v.Secs
 		totalSessions += v.Sessions
 	}
-	current, longest := computeStreaks(stats)
-	bestDay, bestDaySecs := mostActiveDay(stats)
+	current, longest := report.Streaks(stats)
+	bestDay, bestDaySecs := report.MostActiveDay(stats)
 
 	label := styleMuted.Width(18)
 	value := styleBright.Bold(true)
