@@ -26,8 +26,11 @@ Local-first terminal Pomodoro tracker. Cobra CLI + Bubble Tea TUI. SQLite via
 
 - **`main.go` → `cmd/`** — Cobra command tree. `cmd/root.go` `Execute()` opens the
   DB once, stashes it in the package-level `database` var, and every command reads
-  that. Bare `pomo` with no args opens the interactive dashboard; `pomo <task>` is
-  a shortcut for `pomo start <task>`.
+  that. Bare `pomo` opens the dashboard; `pomo <task>` opens the app on the
+  duration-confirm screen with the task pre-filled (`tui.RunAppQuickStart` /
+  `quickStartApp`) — nothing runs until the user hits enter, which also stops a
+  mistyped subcommand from silently starting a timer. `pomo start <task>` is the
+  explicit headless path (honours `--duration` / `--tag`).
 - **`internal/db`** — `DB` wraps `*sql.DB`. Schema is an inline `CREATE TABLE IF
   NOT EXISTS` string run on `Open()` (no migration framework). Tables: `tasks`,
   `sessions`, `config` (key/value). DB file lives at `~/.pomo/pomo.db`.

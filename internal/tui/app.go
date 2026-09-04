@@ -78,6 +78,7 @@ type App struct {
 	pendingTask    string
 	pendingTag     string
 	pendingSession int64
+	durationOrigin screen
 
 	settingsCursor int
 	statsPeriod    int
@@ -234,8 +235,46 @@ func RunAppTaskSelect(d *db.DB) error {
 	return err
 }
 
+// RunAppQuickStart opens the app on the duration-confirm screen with the task
+// pre-filled, for `pomo <task>`. The user confirms the name and picks a length
+// (or presses esc); nothing is started until they hit enter. If a session is
+// already running it just opens the dashboard.
+func RunAppQuickStart(d *db.DB, taskName, tag string) error {
+	a, err := quickStartApp(d, taskName, tag)
+	if err != nil {
+		return err
+	}
+	a.connectDaemon()
+	defer a.closeDaemon()
+	p := tea.NewProgram(a, tea.WithAltScreen())
+	_, e := p.Run()
+	return e
+}
+
+// quickStartApp builds the App for `pomo <task>`: on the duration-confirm
+// screen with the task pre-filled, or on the dashboard if a session is
+// already running.
+func quickStartApp(d *db.DB, taskName, tag string) (*App, error) {
+	a := NewApp(d)
+	if s, err := d.LastRunningSession(); err == nil && s != nil {
+		return a, nil
+	}
+	taskID, err := d.FindOrCreateTask(taskName, tag)
+	if err != nil {
+		return nil, err
+	}
+	a.pendingTaskID = taskID
+	a.pendingTask = taskName
+	a.pendingTag = tag
+	a.durationInput.SetValue("")
+	a.durationInput.Focus()
+	a.durationOrigin = screenDashboard
+	a.screen = screenDuration
+	return a, nil
+}
+
 func (a *App) Init() tea.Cmd {
-	return tea.Batch(dashTick(), a.waitDaemonEvent())
+	return tea.Batch(dashTick(), a.waitDaemonEvent(), textinput.Blink)
 }
 
 func (a *App) loadTaskList() {
@@ -494,6 +533,7 @@ func (a *App) goToDuration(taskID int64, name, tag string) (tea.Model, tea.Cmd) 
 	a.pendingTag = tag
 	a.durationInput.SetValue("")
 	a.durationInput.Focus()
+	a.durationOrigin = screenTaskSelect
 	a.screen = screenDuration
 	return a, textinput.Blink
 }
@@ -502,7 +542,7 @@ func (a *App) updateDuration(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if km, ok := msg.(tea.KeyMsg); ok {
 		switch km.String() {
 		case "esc":
-			a.screen = screenTaskSelect
+			a.screen = a.durationOrigin
 			return a, nil
 		case "enter":
 			minutes := int(a.cfg.Focus.Minutes())

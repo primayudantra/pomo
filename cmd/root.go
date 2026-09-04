@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"pomo/internal/db"
+	"pomo/internal/tui"
 )
 
 var database *db.DB
@@ -17,8 +19,11 @@ var rootCmd = &cobra.Command{
 	Args:  cobra.ArbitraryArgs,
 	RunE: func(c *cobra.Command, args []string) error {
 		if len(args) > 0 {
-			// Quick start: `pomo "Fix reconciliation"` == `pomo start "Fix reconciliation"`
-			return runStart(c, args)
+			// Quick start: open the app on the duration-confirm screen with the
+			// task pre-filled. Nothing runs until the user hits enter — this also
+			// keeps a mistyped subcommand (`pomo daemons tart`) from silently
+			// launching a timer.
+			return tui.RunAppQuickStart(database, strings.Join(args, " "), "")
 		}
 		return runDashboard()
 	},
