@@ -111,10 +111,3 @@ var (
 	recapTimeout = 8 * time.Second
 	chatTimeout  = 30 * time.Second
 )
-
-// --- temporary stubs, removed in Task 5 ---
-func (p *httpProvider) Line(context.Context, NudgeContext) (string, error)  { return "", ErrNoProvider }
-func (p *httpProvider) Recap(context.Context, RecapContext) (string, error) { return "", ErrNoProvider }
-func (p *httpProvider) Stream(context.Context, string, []Msg, func(string)) error {
-	return ErrNoProvider
-}
