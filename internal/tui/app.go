@@ -113,6 +113,10 @@ type App struct {
 const (
 	settingRowSound = iota
 	settingRowSoundChoice
+	settingRowDriftEnabled
+	settingRowCheckpoint
+	settingRowNudges
+	settingRowAIProvider
 	settingRowCount
 )
 
@@ -411,6 +415,19 @@ func (a *App) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.cfg.Sound {
 				sound.Play(a.cfg.SoundChoice)
 			}
+		case settingRowDriftEnabled:
+			a.cfg.Drift.Enabled = !a.cfg.Drift.Enabled
+			_ = a.db.SetConfig("drift.enabled", strconv.FormatBool(a.cfg.Drift.Enabled))
+		case settingRowCheckpoint:
+			a.cfg.CheckpointEnabled = !a.cfg.CheckpointEnabled
+			_ = a.db.SetConfig("checkpoint.enabled", strconv.FormatBool(a.cfg.CheckpointEnabled))
+		case settingRowNudges:
+			a.cfg.Nudge.Enabled = !a.cfg.Nudge.Enabled
+			_ = a.db.SetConfig("nudge.enabled", strconv.FormatBool(a.cfg.Nudge.Enabled))
+		case settingRowAIProvider:
+			next := map[string]string{"": "anthropic", "anthropic": "openrouter", "openrouter": ""}
+			a.cfg.AI.Provider = next[a.cfg.AI.Provider]
+			_ = a.db.SetConfig("ai.provider", a.cfg.AI.Provider)
 		}
 	}
 	return a, nil
@@ -785,6 +802,32 @@ func (a *App) settingsView() string {
 	b.WriteString("\n")
 	b.WriteString(cursor(settingRowSoundChoice) + label.Render("Start Sound") +
 		rowStyle(a.settingsCursor == settingRowSoundChoice).Render(choiceVal))
+	b.WriteString("\n\n")
+
+	onOff := func(v bool) string {
+		if v {
+			return "On"
+		}
+		return "Off"
+	}
+	b.WriteString(cursor(settingRowDriftEnabled) + label.Render("Drift Detect") +
+		rowStyle(a.settingsCursor == settingRowDriftEnabled).Render(onOff(a.cfg.Drift.Enabled)))
+	b.WriteString("\n")
+	b.WriteString(cursor(settingRowCheckpoint) + label.Render("Checkpoint") +
+		rowStyle(a.settingsCursor == settingRowCheckpoint).Render(onOff(a.cfg.CheckpointEnabled)))
+	b.WriteString("\n")
+	b.WriteString(cursor(settingRowNudges) + label.Render("Nudges") +
+		rowStyle(a.settingsCursor == settingRowNudges).Render(onOff(a.cfg.Nudge.Enabled)))
+	b.WriteString("\n")
+	provVal := a.cfg.AI.Provider
+	if provVal == "" {
+		provVal = "off"
+	}
+	b.WriteString(cursor(settingRowAIProvider) + label.Render("AI Provider") +
+		rowStyle(a.settingsCursor == settingRowAIProvider).Render(provVal))
+	b.WriteString("\n\n")
+	b.WriteString(styleDim.Render("AI key: " + pomoconfig.MaskKey(a.cfg.AI.Key) +
+		"   (set with: pomo config set ai.key …)"))
 	b.WriteString("\n\n")
 	b.WriteString(dimHelp("↑/↓ move   enter/←/→ change   esc back"))
 	return b.String()
