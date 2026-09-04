@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `make build` — `go build -o pomo .`
 - `make install` — build + copy to `~/.local/bin/pomo`
 - `go run .` — run without installing
-- `go vet ./...` — static checks (no test suite exists yet)
+- `make test` / `go test ./...` — test suite (add `-run TestName ./pkg/` for one test)
+- `go vet ./...` — static checks
 
 Requires Go 1.25.
 
@@ -37,6 +38,10 @@ Local-first terminal Pomodoro tracker. Cobra CLI + Bubble Tea TUI. SQLite via
   from the dashboard exits. `theme.go` = lipgloss styles.
 - **`internal/sound`** — 4 mp3 clips `//go:embed`-ed; playback shells out to a
   platform audio player (`afplay` on macOS) against a temp file.
+- **`internal/report`** — all windowed aggregation (sessions + `drift_events`) and
+  rendering (text / markdown / JSON). Shared by `pomo review`, the TUI stats
+  screen, and (later) the daemon's weekly digest. Day-bucket and streak helpers
+  live here, not in `internal/tui`.
 
 ## Conventions
 
@@ -46,3 +51,9 @@ Local-first terminal Pomodoro tracker. Cobra CLI + Bubble Tea TUI. SQLite via
   mostly just tell you to use the in-timer keybinding (`[p]`/`[r]`).
 - New commands: add a file in `cmd/`, register in its `init()` with
   `rootCmd.AddCommand(...)`.
+- Two processes will open `~/.pomo/pomo.db` (CLI + planned daemon); it runs in WAL
+  mode with a 5s busy timeout. Keep writes small. `db.OpenAt(path)` is the
+  test/tools entrypoint; `db.Open()` is the normal one.
+- Additive schema changes: new tables via the `schema` const
+  (`CREATE TABLE IF NOT EXISTS`); new columns via `ensureColumn` in `OpenAt`
+  (SQLite `ALTER TABLE ADD COLUMN` is not idempotent).
