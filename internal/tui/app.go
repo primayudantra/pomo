@@ -9,9 +9,11 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"pomo/internal/ai"
 	"pomo/internal/db"
 	"pomo/internal/gitinfo"
 	"pomo/internal/model"
@@ -32,6 +34,9 @@ const (
 	screenSettings
 	screenStats
 	screenQuitConfirm
+	screenPrompt
+	screenResult
+	screenChat
 )
 
 const (
@@ -80,6 +85,23 @@ type App struct {
 	quitErr   bool
 
 	startCwd string
+
+	promptInput  textinput.Model
+	promptOrigin screen
+	promptErr    string
+
+	result      viewport.Model
+	resultTitle string
+	resultCmd   slashCommand
+
+	chat          viewport.Model
+	chatInput     textinput.Model
+	chatHistory   []ai.Msg
+	chatStreaming bool
+	chatErr       string
+	chatCancel    func()
+
+	daemonUp bool
 }
 
 const (
@@ -144,6 +166,19 @@ func NewApp(d *db.DB) *App {
 	qi.PromptStyle = styleAccent
 	qi.TextStyle = styleBright
 
+	pi := textinput.New()
+	pi.CharLimit = 120
+	pi.Width = 40
+	pi.PromptStyle = styleAccent
+	pi.TextStyle = styleBright
+
+	ci := textinput.New()
+	ci.Placeholder = "type a message..."
+	ci.CharLimit = maxChatInput
+	ci.Width = 60
+	ci.PromptStyle = styleAccent
+	ci.TextStyle = styleBright
+
 	cwd, _ := os.Getwd()
 
 	a := &App{
@@ -157,6 +192,10 @@ func NewApp(d *db.DB) *App {
 		noteInput:     note,
 		quitInput:     qi,
 		startCwd:      cwd,
+		promptInput:   pi,
+		chatInput:     ci,
+		result:        viewport.New(80, 20),
+		chat:          viewport.New(80, 20),
 	}
 	return a
 }
@@ -224,6 +263,12 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.updateStats(msg)
 	case screenQuitConfirm:
 		return a.updateQuitConfirm(msg)
+	case screenPrompt:
+		return a.updatePrompt(msg)
+	case screenResult:
+		return a.updateResult(msg)
+	case screenChat:
+		return a.updateChat(msg)
 	}
 	return a, nil
 }
@@ -274,6 +319,8 @@ func (a *App) updateDashboard(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "a":
 			a.screen = screenStats
 			return a, nil
+		case "/":
+			return a.enterPrompt(screenDashboard)
 		}
 	}
 	return a, cmd
@@ -499,6 +546,9 @@ func (a *App) playFinishSound() {
 }
 
 func (a *App) updateTimer(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if km, ok := msg.(tea.KeyMsg); ok && km.String() == "/" {
+		return a.enterPrompt(screenTimer)
+	}
 	if km, ok := msg.(tea.KeyMsg); ok && km.String() == "m" {
 		a.muted = !a.muted
 		if a.muted {
@@ -615,6 +665,12 @@ func (a *App) View() string {
 		content = "\n" + lipgloss.NewStyle().Foreground(a.flashColor).Render(a.flash) + "\n\n" +
 			styleBright.Bold(true).Render("Add a note?") + styleMuted.Render(" (optional)") +
 			"\n\n" + a.noteInput.View() + "\n\n" + dimHelp("enter/esc continue")
+	case screenPrompt:
+		content = a.viewPrompt()
+	case screenResult:
+		content = a.viewResult()
+	case screenChat:
+		content = a.viewChat()
 	default:
 		view := a.dash.View()
 		if a.flash != "" {

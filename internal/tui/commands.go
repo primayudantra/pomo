@@ -22,7 +22,6 @@ var slashCommands = []slashCommand{
 	{Name: "/drift", Help: "drift so far this session (or today)"},
 	{Name: "/chat", Aliases: []string{"/ask"}, Help: "talk to your focus coach"},
 	{Name: "/start", Help: "start a session on a task"},
-	{Name: "/note", Help: "add a note to the running session", NeedsSession: true},
 	{Name: "/skip", Help: "skip the running session", NeedsSession: true},
 	{Name: "/settings", Aliases: []string{"/config"}, Help: "open settings"},
 	{Name: "/help", Aliases: []string{"/?"}, Help: "list commands"},
