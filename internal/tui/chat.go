@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"pomo/internal/ai"
 	"pomo/internal/report"
@@ -165,15 +166,25 @@ func (a *App) appendAssistant(s string) {
 }
 
 func (a *App) renderChat() {
+	wrapW := a.chat.Width - 2
+	if wrapW < 20 {
+		wrapW = 60
+	}
+	wrap := lipgloss.NewStyle().Width(wrapW)
+
 	var b strings.Builder
 	for _, m := range a.chatHistory {
-		who := "you"
+		who := styleAccent.Render("you")
 		if m.Role == "assistant" {
-			who = "pomo"
+			who = styleBright.Bold(true).Render("pomo")
 		}
-		b.WriteString(styleAccent.Render(who) + "  " + m.Content + "\n\n")
+		body := m.Content
+		if strings.TrimSpace(body) == "" && m.Role == "assistant" {
+			body = styleMuted.Render("…")
+		}
+		b.WriteString(who + "\n" + wrap.Render(body) + "\n\n")
 	}
-	a.chat.SetContent(b.String())
+	a.chat.SetContent(strings.TrimRight(b.String(), "\n"))
 	a.chat.GotoBottom()
 }
 
@@ -200,14 +211,17 @@ func (a *App) updateChat(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) viewChat() string {
+	head := styleBright.Bold(true).Render("/chat") + "  " + styleMuted.Render("focus coach")
 	if a.cfg.AI.Provider == "" {
-		return "\n" + a.chat.View() + "\n" + dimHelp("esc back")
+		return head + "\n\n" +
+			styleMuted.Render("set  ai.provider  and  ai.key  in /settings to enable chat") +
+			"\n\n" + dimHelp("esc back")
 	}
 	foot := "enter send · esc back"
 	if a.chatStreaming {
 		foot = "…streaming · esc cancel"
 	}
-	b := "\n" + a.chat.View() + "\n\n" + a.chatInput.View()
+	b := head + "\n\n" + a.chat.View() + "\n\n" + a.chatInput.View()
 	if a.chatErr != "" {
 		b += "\n" + styleErr.Render(a.chatErr)
 	}

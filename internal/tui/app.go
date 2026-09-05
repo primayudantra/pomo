@@ -307,8 +307,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if wmsg, ok := msg.(tea.WindowSizeMsg); ok {
 		a.width, a.height = wmsg.Width, wmsg.Height
-		a.result.Width, a.result.Height = wmsg.Width, max(4, wmsg.Height-6)
-		a.chat.Width, a.chat.Height = wmsg.Width, max(4, wmsg.Height-6)
+		vw := max(20, wmsg.Width-2)
+		a.result.Width, a.result.Height = vw, max(4, wmsg.Height-6)
+		a.chat.Width, a.chat.Height = vw, max(4, wmsg.Height-8)
+		a.chatInput.Width = max(20, vw-4)
+		if a.screen == screenChat {
+			a.renderChat()
+		}
 	}
 
 	if rm, ok := msg.(recapMsg); ok {
@@ -864,6 +869,11 @@ func (a *App) View() string {
 
 	if a.width == 0 || a.height == 0 {
 		return content
+	}
+	switch a.screen {
+	case screenChat, screenResult, screenPrompt:
+		// text-heavy screens: fill from the top-left, don't centre
+		return lipgloss.Place(a.width, a.height, lipgloss.Left, lipgloss.Top, content)
 	}
 	return lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, content)
 }
