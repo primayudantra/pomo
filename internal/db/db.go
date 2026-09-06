@@ -234,8 +234,24 @@ func (d *DB) DeleteSession(id int64) error {
 
 func (d *DB) FinishSession(id int64, status model.SessionStatus, actualDuration int, note string) error {
 	now := time.Now()
-	_, err := d.Exec(`UPDATE sessions SET status = ?, actual_duration = ?, note = ?, completed_at = ? WHERE id = ?`,
-		status, actualDuration, note, now, id)
+	res, err := d.Exec(`UPDATE sessions SET status = ?, actual_duration = ?, note = ?, completed_at = ? WHERE id = ? AND status = ?`,
+		status, actualDuration, note, now, id, model.StatusRunning)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("session %d not running", id)
+	}
+	return nil
+}
+
+// SetSessionNote attaches a note to an already-finished session.
+func (d *DB) SetSessionNote(id int64, note string) error {
+	_, err := d.Exec(`UPDATE sessions SET note = ? WHERE id = ?`, note, id)
 	return err
 }
 

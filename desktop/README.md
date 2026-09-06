@@ -38,15 +38,17 @@ make desktop-build   # cd desktop && wails build — produces build/bin/pomo-des
   from a second launch needs IPC and is deferred past v1.
 - `frontend/dist/` and `frontend/node_modules/` and `build/bin/` are gitignored;
   `wails build` / `wails dev` regenerate them.
-- **Window lifecycle:** closing the window hides it (`OnBeforeClose` →
-  `WindowHide`); the real exit path is `App.Quit`, which prompts if a session
-  is running/paused. The hidden window comes back via the macOS dock icon.
+- **Window lifecycle (v1):** closing the window quits the app. If a session is
+  running/paused, `OnBeforeClose` (`app.onBeforeClose`) first prompts
+  (Leave it running / Cancel session / Stay); "Stay" keeps the window open,
+  the other two let the close proceed. No hide-on-close in v1 — that returns
+  with the menubar tray in v1.1.
 
 ## v1.1 backlog
 
 - Menubar tray: live countdown in the menubar plus quick controls
-  (pause/resume/stop). Deferred — v1 is window-only, and the dock icon
-  re-opens a hidden window.
+  (pause/resume/stop). Deferred — v1 is window-only. The tray also brings back
+  hide-on-close (closing the window leaves the app resident in the menubar).
 
 ## Manual checklist (run on a Mac)
 

@@ -23,6 +23,9 @@ type TodayView struct {
 	Sessions     []SessionRow `json:"sessions"`
 }
 
+// roundMinutes converts a second count to whole minutes, rounded to nearest.
+func roundMinutes(secs int) int { return int(float64(secs)/60.0 + 0.5) }
+
 // SessionService exposes today's sessions to the frontend.
 type SessionService struct{ db *db.DB }
 
@@ -44,13 +47,13 @@ func (s *SessionService) Today() (TodayView, error) {
 	for _, sess := range sessions {
 		v.Sessions = append(v.Sessions, SessionRow{
 			Task:      sess.TaskName,
-			Minutes:   int((float64(sess.ActualDuration) / 60.0) + 0.5),
+			Minutes:   roundMinutes(sess.ActualDuration),
 			Status:    string(sess.Status),
 			StartedAt: sess.StartedAt.Format(time.RFC3339),
 		})
 		if sess.Status == model.StatusCompleted {
 			v.Count++
-			v.FocusMinutes += int((float64(sess.ActualDuration) / 60.0) + 0.5)
+			v.FocusMinutes += roundMinutes(sess.ActualDuration)
 		}
 	}
 	return v, nil

@@ -137,6 +137,32 @@ func TestStartBreakIgnoredWhileRunning(t *testing.T) {
 	}
 }
 
+func TestStartRejectsNonPositiveMinutes(t *testing.T) {
+	ts, _, d := newTestTimer(t)
+	if _, err := ts.Start("x", 0); err == nil {
+		t.Fatal("Start(0) should error")
+	}
+	if _, err := ts.Start("x", -5); err == nil {
+		t.Fatal("Start(-5) should error")
+	}
+	if s, _ := d.LastRunningSession(); s != nil {
+		t.Fatal("no session row should be created for a bad duration")
+	}
+	if ts.GetState().Phase != PhaseIdle {
+		t.Fatal("phase should stay idle")
+	}
+}
+
+func TestStartBreakRejectsNonPositiveMinutes(t *testing.T) {
+	ts, clk, _ := newTestTimer(t)
+	ts.Start("x", 25)
+	clk.add(25 * time.Minute)
+	ts.tick() // -> break_prompt
+	if got := ts.StartBreak(0).Phase; got != PhaseBreakPrompt {
+		t.Fatalf("StartBreak(0) should no-op, phase = %s", got)
+	}
+}
+
 func TestStartRefusesSecondSession(t *testing.T) {
 	ts, _, _ := newTestTimer(t)
 	ts.Start("first", 25)

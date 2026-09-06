@@ -97,7 +97,7 @@ func runStart(c *cobra.Command, args []string) error {
 		fmt.Printf("🍅 Pomodoro completed!\n\nTask:\n%s\n\nDuration:\n%d minutes\n\n", taskName, tm.Result.ActualSeconds/60)
 		note := promptNote()
 		if note != "" {
-			_ = database.FinishSession(sessionID, status, tm.Result.ActualSeconds, note)
+			_ = database.SetSessionNote(sessionID, note)
 		}
 		fmt.Println("\n✓ Saved to history")
 	case model.StatusSkipped:

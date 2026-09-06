@@ -81,6 +81,10 @@ func (t *TimerService) Start(task string, minutes int) (State, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	if minutes <= 0 {
+		return t.st, errors.New("duration must be positive")
+	}
+
 	running, err := t.db.LastRunningSession()
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return t.st, err
@@ -103,6 +107,7 @@ func (t *TimerService) Start(task string, minutes int) (State, error) {
 		StartedAt:       now,
 	})
 	if err != nil {
+		t.emit(EventError, map[string]string{"message": "could not start session: " + err.Error()})
 		return t.st, err
 	}
 
@@ -129,7 +134,7 @@ func (t *TimerService) Pause() State {
 		return t.st
 	}
 	now := t.clk.Now()
-	_ = t.db.SetPaused(t.st.SessionID, now)
+	_ = t.db.SetPaused(t.st.SessionID, now) // best-effort: a lost pause is not data loss
 	t.pausedAt = now
 	t.st.Phase = PhasePaused
 	t.recompute(now)
@@ -146,7 +151,7 @@ func (t *TimerService) Resume() State {
 	}
 	now := t.clk.Now()
 	pause := int(now.Sub(t.pausedAt) / time.Second)
-	_ = t.db.ClearPaused(t.st.SessionID, pause)
+	_ = t.db.ClearPaused(t.st.SessionID, pause) // best-effort: a lost pause is not data loss
 	t.pauseAccum += pause
 	t.pausedAt = time.Time{}
 	t.st.Phase = PhaseRunning
@@ -164,7 +169,9 @@ func (t *TimerService) Cancel() State {
 	}
 	now := t.clk.Now()
 	elapsed := t.elapsedFocus(now)
-	_ = t.db.FinishSession(t.st.SessionID, model.StatusCancelled, elapsed, "")
+	if err := t.db.FinishSession(t.st.SessionID, model.StatusCancelled, elapsed, ""); err != nil {
+		t.emit(EventError, map[string]string{"message": "could not cancel session: " + err.Error()})
+	}
 	t.st = State{Phase: PhaseIdle}
 	t.emit(EventToday, nil)
 	t.emit(EventPhase, t.st)
@@ -175,7 +182,7 @@ func (t *TimerService) Cancel() State {
 func (t *TimerService) StartBreak(minutes int) State {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.st.Phase != PhaseBreakPrompt {
+	if t.st.Phase != PhaseBreakPrompt || minutes <= 0 {
 		return t.st
 	}
 	now := t.clk.Now()
@@ -261,7 +268,13 @@ func (t *TimerService) complete(now time.Time) {
 		elapsed = t.st.Duration
 	}
 	task := t.st.Task
-	_ = t.db.FinishSession(t.st.SessionID, model.StatusCompleted, elapsed, "")
+	if err := t.db.FinishSession(t.st.SessionID, model.StatusCompleted, elapsed, ""); err != nil {
+		t.emit(EventError, map[string]string{"message": "could not finish session: " + err.Error()})
+		t.st = State{Phase: PhaseIdle}
+		t.emit(EventToday, nil)
+		t.emit(EventPhase, t.st)
+		return
+	}
 	playFinish()
 	go sendNotify("Pomodoro done", task)
 	t.st = State{Phase: PhaseBreakPrompt, Task: task}
@@ -308,7 +321,9 @@ func (t *TimerService) rehydrate() {
 	now := t.clk.Now()
 	elapsed := t.elapsedFocus(now)
 	if elapsed >= s.PlannedDuration {
-		_ = t.db.FinishSession(s.ID, model.StatusCompleted, s.PlannedDuration, "")
+		if err := t.db.FinishSession(s.ID, model.StatusCompleted, s.PlannedDuration, ""); err != nil {
+			t.emit(EventError, map[string]string{"message": "could not finish session: " + err.Error()})
+		}
 		t.st = State{Phase: PhaseIdle}
 		t.emit(EventToday, nil)
 		return

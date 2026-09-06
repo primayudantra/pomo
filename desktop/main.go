@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"fmt"
 	"os"
@@ -13,7 +12,6 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	wr "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
@@ -22,6 +20,7 @@ var assets embed.FS
 func main() {
 	// Single-instance lock: a second launch exits quietly. Focusing the
 	// existing window would need IPC; that is deferred past v1.
+	_ = os.MkdirAll(db.Dir(), 0o755)
 	if lock, err := os.OpenFile(
 		filepath.Join(db.Dir(), "desktop.lock"),
 		os.O_CREATE|os.O_RDWR, 0o644); err == nil {
@@ -45,18 +44,9 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
-		// Closing the window hides it instead of quitting; the real exit
-		// path is App.Quit (which guards a running session). In v1 the
-		// user gets the window back by clicking the dock icon — Wails'
-		// default applicationShouldHandleReopen shows the hidden window.
-		// A menubar tray with quick controls comes in v1.1.
-		OnBeforeClose: func(ctx context.Context) (prevent bool) {
-			if app.reallyQuit {
-				return false
-			}
-			wr.WindowHide(ctx)
-			return true
-		},
+		// v1: closing the window quits the app (after the running-session
+		// prompt). Hide-on-close returns with the menubar tray in v1.1.
+		OnBeforeClose: app.onBeforeClose,
 		Bind: []interface{}{
 			app,
 			app.timer,

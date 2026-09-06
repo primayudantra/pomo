@@ -15,36 +15,36 @@ type App struct {
 	timer     *TimerService
 	session   *SessionService
 	daemonSvc *DaemonService
-
-	// reallyQuit is set by Quit() to let OnBeforeClose fall through to a
-	// real exit instead of hiding the window.
-	reallyQuit bool
 }
 
-// Quit is the app's real exit path. If a session is running or paused it
-// asks the user what to do first. Bound, so JS can call it too.
-func (a *App) Quit() {
+// onBeforeClose runs when the user closes the window. In v1 closing the
+// window quits the app (hide-on-close returns with the tray in v1.1). If a
+// session is running or paused we prompt first. Returning true prevents the
+// close.
+func (a *App) onBeforeClose(ctx context.Context) (prevent bool) {
 	st := a.timer.GetState()
-	if st.Phase == PhaseRunning || st.Phase == PhasePaused {
-		sel, _ := wr.MessageDialog(a.ctx, wr.MessageDialogOptions{
-			Type:          wr.QuestionDialog,
-			Title:         "Session still running",
-			Message:       "A Pomodoro is still running. What do you want to do?",
-			Buttons:       []string{"Leave it running", "Cancel session", "Stay"},
-			DefaultButton: "Leave it running",
-			CancelButton:  "Stay",
-		})
-		switch sel {
-		case "Stay":
-			return
-		case "Cancel session":
-			a.timer.Cancel()
-		}
-		// "Leave it running" falls through — the row stays `running` and
-		// rehydrates on next launch.
+	if st.Phase != PhaseRunning && st.Phase != PhasePaused {
+		return false
 	}
-	a.reallyQuit = true
-	wr.Quit(a.ctx)
+	sel, _ := wr.MessageDialog(ctx, wr.MessageDialogOptions{
+		Type:          wr.QuestionDialog,
+		Title:         "Session still running",
+		Message:       "A Pomodoro is still running. What do you want to do?",
+		Buttons:       []string{"Leave it running", "Cancel session", "Stay"},
+		DefaultButton: "Leave it running",
+		CancelButton:  "Stay",
+	})
+	switch sel {
+	case "Stay":
+		return true
+	case "Cancel session":
+		a.timer.Cancel()
+		return false
+	default:
+		// "Leave it running" — the row stays `running` and rehydrates
+		// on next launch.
+		return false
+	}
 }
 
 // NewApp creates a new App application struct
