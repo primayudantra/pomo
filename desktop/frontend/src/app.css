@@ -1,0 +1,33 @@
+:root {
+  --bg: #1a1a1a;
+  --fg: #e8e8e8;
+  --accent: #e14434;
+  --muted: #8a8a8a;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f7f7;
+    --fg: #1a1a1a;
+    --accent: #e14434;
+    --muted: #6a6a6a;
+  }
+}
+
+html,
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
+#app {
+  height: 100vh;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.countdown {
+  font-variant-numeric: tabular-nums;
+}
