@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	wr "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
@@ -43,6 +45,18 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
+		// Closing the window hides it instead of quitting; the real exit
+		// path is App.Quit (which guards a running session). In v1 the
+		// user gets the window back by clicking the dock icon — Wails'
+		// default applicationShouldHandleReopen shows the hidden window.
+		// A menubar tray with quick controls comes in v1.1.
+		OnBeforeClose: func(ctx context.Context) (prevent bool) {
+			if app.reallyQuit {
+				return false
+			}
+			wr.WindowHide(ctx)
+			return true
+		},
 		Bind: []interface{}{
 			app,
 			app.timer,

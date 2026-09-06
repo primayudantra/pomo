@@ -38,3 +38,12 @@ make desktop-build   # cd desktop && wails build — produces build/bin/pomo-des
   from a second launch needs IPC and is deferred past v1.
 - `frontend/dist/` and `frontend/node_modules/` and `build/bin/` are gitignored;
   `wails build` / `wails dev` regenerate them.
+- **Window lifecycle:** closing the window hides it (`OnBeforeClose` →
+  `WindowHide`); the real exit path is `App.Quit`, which prompts if a session
+  is running/paused. The hidden window comes back via the macOS dock icon.
+
+## v1.1 backlog
+
+- Menubar tray: live countdown in the menubar plus quick controls
+  (pause/resume/stop). Deferred — v1 is window-only, and the dock icon
+  re-opens a hidden window.
