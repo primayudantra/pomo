@@ -8,10 +8,11 @@ import (
 
 // App struct
 type App struct {
-	ctx     context.Context
-	db      *db.DB
-	timer   *TimerService
-	session *SessionService
+	ctx       context.Context
+	db        *db.DB
+	timer     *TimerService
+	session   *SessionService
+	daemonSvc *DaemonService
 }
 
 // NewApp creates a new App application struct
@@ -21,9 +22,10 @@ func NewApp() *App {
 		panic(err)
 	}
 	return &App{
-		db:      d,
-		timer:   NewTimerService(d, realClock{}),
-		session: NewSessionService(d),
+		db:        d,
+		timer:     NewTimerService(d, realClock{}),
+		session:   NewSessionService(d),
+		daemonSvc: NewDaemonService(),
 	}
 }
 

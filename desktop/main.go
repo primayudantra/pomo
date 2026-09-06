@@ -47,6 +47,7 @@ func main() {
 			app,
 			app.timer,
 			app.session,
+			app.daemonSvc,
 		},
 	})
 
