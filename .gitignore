@@ -15,3 +15,9 @@ daemon.log
 .DS_Store
 
 .worktrees/
+
+# desktop (Wails) app
+desktop/frontend/node_modules/
+desktop/frontend/dist/*
+!desktop/frontend/dist/.gitkeep
+desktop/build/bin/
