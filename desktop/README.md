@@ -47,3 +47,14 @@ make desktop-build   # cd desktop && wails build — produces build/bin/pomo-des
 - Menubar tray: live countdown in the menubar plus quick controls
   (pause/resume/stop). Deferred — v1 is window-only, and the dock icon
   re-opens a hidden window.
+
+## Manual checklist (run on a Mac)
+
+- [ ] launch, run a 1-min session, quit mid-run, relaunch → timer rehydrates
+- [ ] pause, quit, relaunch → still paused, correct remaining
+- [ ] complete a session → chime + notification + break prompt
+- [ ] Today totals update after a completed session
+- [ ] tracking toggle on/off ↔ `pomo daemon status`
+- [ ] external `pomo daemon stop` reflected in the UI within ~5s
+- [ ] second `open pomo-desktop.app` → exits quietly, first instance intact
+- [ ] `pomo start` in a terminal → desktop QuickStart shows the running-session error
