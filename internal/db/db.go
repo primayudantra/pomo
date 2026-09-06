@@ -88,6 +88,8 @@ func OpenAt(path string) (*DB, error) {
 	for _, c := range []struct{ table, col, ddl string }{
 		{"sessions", "repo_path", "repo_path TEXT DEFAULT ''"},
 		{"sessions", "repo_branch", "repo_branch TEXT DEFAULT ''"},
+		{"sessions", "paused_at", "paused_at TEXT DEFAULT ''"},
+		{"sessions", "pause_accum_secs", "pause_accum_secs INTEGER NOT NULL DEFAULT 0"},
 	} {
 		if err := ensureColumn(sqlDB, c.table, c.col, c.ddl); err != nil {
 			return nil, fmt.Errorf("migrate %s.%s: %w", c.table, c.col, err)
@@ -238,7 +240,7 @@ func (d *DB) FinishSession(id int64, status model.SessionStatus, actualDuration 
 }
 
 func (d *DB) LastRunningSession() (*model.Session, error) {
-	row := d.QueryRow(`SELECT id, task_id, task_name, tag, planned_duration, actual_duration, status, note, started_at, completed_at, created_at, repo_path, repo_branch
+	row := d.QueryRow(`SELECT id, task_id, task_name, tag, planned_duration, actual_duration, status, note, started_at, completed_at, created_at, repo_path, repo_branch, paused_at, pause_accum_secs
 		FROM sessions WHERE status = 'running' ORDER BY id DESC LIMIT 1`)
 	return scanSession(row)
 }
@@ -246,14 +248,34 @@ func (d *DB) LastRunningSession() (*model.Session, error) {
 func scanSession(row *sql.Row) (*model.Session, error) {
 	var s model.Session
 	var completedAt sql.NullTime
+	var pausedAt sql.NullString
 	if err := row.Scan(&s.ID, &s.TaskID, &s.TaskName, &s.Tag, &s.PlannedDuration, &s.ActualDuration,
-		&s.Status, &s.Note, &s.StartedAt, &completedAt, &s.CreatedAt, &s.RepoPath, &s.RepoBranch); err != nil {
+		&s.Status, &s.Note, &s.StartedAt, &completedAt, &s.CreatedAt, &s.RepoPath, &s.RepoBranch,
+		&pausedAt, &s.PauseAccumSecs); err != nil {
 		return nil, err
 	}
 	if completedAt.Valid {
 		s.CompletedAt = &completedAt.Time
 	}
+	if pausedAt.Valid && pausedAt.String != "" {
+		if t, err := time.Parse(time.RFC3339, pausedAt.String); err == nil {
+			s.PausedAt = &t
+		}
+	}
 	return &s, nil
+}
+
+func (d *DB) SetPaused(id int64, at time.Time) error {
+	_, err := d.Exec(`UPDATE sessions SET paused_at = ? WHERE id = ?`,
+		at.Format(time.RFC3339), id)
+	return err
+}
+
+func (d *DB) ClearPaused(id int64, addSecs int) error {
+	_, err := d.Exec(`UPDATE sessions
+		SET paused_at = '', pause_accum_secs = pause_accum_secs + ?
+		WHERE id = ?`, addSecs, id)
+	return err
 }
 
 type SessionFilter struct {
@@ -264,7 +286,7 @@ type SessionFilter struct {
 }
 
 func (d *DB) ListSessions(f SessionFilter) ([]model.Session, error) {
-	q := `SELECT id, task_id, task_name, tag, planned_duration, actual_duration, status, note, started_at, completed_at, created_at, repo_path, repo_branch
+	q := `SELECT id, task_id, task_name, tag, planned_duration, actual_duration, status, note, started_at, completed_at, created_at, repo_path, repo_branch, paused_at, pause_accum_secs
 		FROM sessions WHERE 1=1`
 	var args []interface{}
 	if f.From != nil {
@@ -294,12 +316,19 @@ func (d *DB) ListSessions(f SessionFilter) ([]model.Session, error) {
 	for rows.Next() {
 		var s model.Session
 		var completedAt sql.NullTime
+		var pausedAt sql.NullString
 		if err := rows.Scan(&s.ID, &s.TaskID, &s.TaskName, &s.Tag, &s.PlannedDuration, &s.ActualDuration,
-			&s.Status, &s.Note, &s.StartedAt, &completedAt, &s.CreatedAt, &s.RepoPath, &s.RepoBranch); err != nil {
+			&s.Status, &s.Note, &s.StartedAt, &completedAt, &s.CreatedAt, &s.RepoPath, &s.RepoBranch,
+			&pausedAt, &s.PauseAccumSecs); err != nil {
 			return nil, err
 		}
 		if completedAt.Valid {
 			s.CompletedAt = &completedAt.Time
+		}
+		if pausedAt.Valid && pausedAt.String != "" {
+			if t, err := time.Parse(time.RFC3339, pausedAt.String); err == nil {
+				s.PausedAt = &t
+			}
 		}
 		sessions = append(sessions, s)
 	}

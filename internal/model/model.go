@@ -34,6 +34,8 @@ type Session struct {
 	CreatedAt       time.Time
 	RepoPath        string
 	RepoBranch      string
+	PausedAt        *time.Time
+	PauseAccumSecs  int
 }
 
 type DriftEvent struct {
