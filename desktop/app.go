@@ -2,26 +2,40 @@ package main
 
 import (
 	"context"
-	"fmt"
+
+	"pomo/internal/db"
 )
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx   context.Context
+	db    *db.DB
+	timer *TimerService
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	d, err := db.Open()
+	if err != nil {
+		panic(err)
+	}
+	return &App{
+		db:    d,
+		timer: NewTimerService(d, realClock{}),
+	}
 }
 
 // startup is called when the app starts. The context is saved
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.timer.Attach(ctx)
 }
 
-// Greet returns a greeting for the given name
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
+// shutdown is called on app exit: stop the ticker, close the db.
+func (a *App) shutdown(ctx context.Context) {
+	a.timer.Shutdown()
+	if a.db != nil {
+		_ = a.db.Close()
+	}
 }
