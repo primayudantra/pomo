@@ -139,3 +139,6 @@ go vet ./...
 
 Architecture notes for contributors (and for Claude Code) are in
 [`CLAUDE.md`](CLAUDE.md).
+
+A macOS desktop shell (Wails v2 + Svelte) lives in [`desktop/`](desktop/) —
+`make desktop-dev` / `make desktop-build`.

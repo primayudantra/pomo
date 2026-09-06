@@ -790,7 +790,7 @@ func (a *App) updateNote(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter", "esc":
 			note := strings.TrimSpace(a.noteInput.Value())
 			if note != "" {
-				_ = a.db.FinishSession(a.pendingSession, model.StatusCompleted, a.timer.Result.ActualSeconds, note)
+				_ = a.db.SetSessionNote(a.pendingSession, note)
 			}
 			a.dash.refresh()
 			if a.cfg.AutoStartBreak {

@@ -1,6 +1,6 @@
 # Desktop App — Design Spec
 
-Status: approved for planning (2026-09-06).
+Status: shipped (2026-09-06); window-only v1, menubar tray deferred to v1.1.
 
 A native macOS desktop app for pomo, built on the existing Go core. First
 desktop surface alongside the Cobra CLI and the Bubble Tea TUI.

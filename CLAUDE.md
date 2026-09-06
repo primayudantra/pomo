@@ -14,6 +14,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   `pomo daemon run` is the foreground loop the detached process executes.
 - `pomo digest [--week YYYY-Www]` — write a week's review digest to
   `~/.pomo/reviews/`. The daemon also writes last week's on the first Monday tick.
+- `pomo desktop` — open the desktop app (`desktop/`, Wails v2 + Svelte).
+  Build it with `make desktop-build`. macOS only.
 
 Requires Go 1.25.
 
@@ -80,6 +82,9 @@ Local-first terminal Pomodoro tracker. Cobra CLI + Bubble Tea TUI. SQLite via
   `notify` + `ipc`. Fully unit-tested with fakes and an injected clock;
   `cmd/daemon.go` is the thin sleep-loop + pidfile/flock wrapper around it
   (detached process + `~/.pomo/daemon.pid`, no launchd/systemd unit yet).
+- **`desktop/`** — Wails v2 (Go backend + Svelte webview) app; `TimerService`
+  owns the timer and writes `sessions` rows like the CLI; third independent
+  `~/.pomo/pomo.db` client, no IPC; menubar tray is v1.1.
 
 ## Conventions
 

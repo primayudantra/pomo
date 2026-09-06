@@ -3,11 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -21,38 +17,6 @@ import (
 	"pomo/internal/pomoconfig"
 	"pomo/internal/watch"
 )
-
-func pidfilePath() string { return filepath.Join(db.Dir(), "daemon.pid") }
-func lockPath() string    { return filepath.Join(db.Dir(), "daemon.lock") }
-func logPath() string     { return filepath.Join(db.Dir(), "daemon.log") }
-
-func readPidfile() (int, bool) {
-	b, err := os.ReadFile(pidfilePath())
-	if err != nil {
-		return 0, false
-	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(b)))
-	if err != nil {
-		return 0, false
-	}
-	return pid, true
-}
-
-func writePidfile(pid int) error {
-	if err := os.MkdirAll(db.Dir(), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(pidfilePath(), []byte(strconv.Itoa(pid)), 0o644)
-}
-
-func removePidfile() { _ = os.Remove(pidfilePath()) }
-
-func pidAlive(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	return syscall.Kill(pid, 0) == nil
-}
 
 var daemonCmd = &cobra.Command{
 	Use:   "daemon",
@@ -69,36 +33,11 @@ var daemonStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the daemon as a detached background process",
 	RunE: func(c *cobra.Command, args []string) error {
-		if pid, ok := readPidfile(); ok && pidAlive(pid) {
-			fmt.Printf("daemon already running (pid %d)\n", pid)
-			return nil
-		}
-		exe, err := os.Executable()
+		pid, err := daemon.Spawn()
 		if err != nil {
 			return err
 		}
-		if err := os.MkdirAll(db.Dir(), 0o755); err != nil {
-			return err
-		}
-		lf, err := os.OpenFile(logPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-		if err != nil {
-			return err
-		}
-		defer lf.Close()
-
-		child := exec.Command(exe, "daemon", "run")
-		child.Stdout = lf
-		child.Stderr = lf
-		child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-		if err := child.Start(); err != nil {
-			return err
-		}
-		pid := child.Process.Pid
-		if err := writePidfile(pid); err != nil {
-			return err
-		}
-		_ = child.Process.Release()
-		fmt.Printf("daemon started (pid %d), logging to %s\n", pid, logPath())
+		fmt.Printf("daemon running (pid %d), logging to %s\n", pid, daemon.LogPath())
 		return nil
 	},
 }
@@ -107,15 +46,15 @@ var daemonStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop the daemon",
 	RunE: func(c *cobra.Command, args []string) error {
-		pid, ok := readPidfile()
-		if !ok || !pidAlive(pid) {
-			removePidfile()
-			fmt.Println("daemon not running")
-			return nil
+		pid, err := daemon.Stop()
+		if err != nil {
+			return err
 		}
-		_ = syscall.Kill(pid, syscall.SIGTERM)
-		removePidfile()
-		fmt.Printf("daemon stopped (pid %d)\n", pid)
+		if pid == 0 {
+			fmt.Println("daemon not running")
+		} else {
+			fmt.Printf("daemon stopped (pid %d)\n", pid)
+		}
 		return nil
 	},
 }
@@ -124,8 +63,8 @@ var daemonStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show daemon status",
 	RunE: func(c *cobra.Command, args []string) error {
-		pid, ok := readPidfile()
-		if !ok || !pidAlive(pid) {
+		pid, ok := daemon.Running()
+		if !ok {
 			fmt.Println("daemon: not running")
 			return nil
 		}
@@ -157,7 +96,7 @@ func runDaemon(c *cobra.Command, args []string) error {
 	if err := os.MkdirAll(db.Dir(), 0o755); err != nil {
 		return err
 	}
-	lock, err := os.OpenFile(lockPath(), os.O_CREATE|os.O_RDWR, 0o644)
+	lock, err := os.OpenFile(daemon.LockPath(), os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return err
 	}
@@ -212,4 +151,3 @@ func runDaemon(c *cobra.Command, args []string) error {
 		}
 	}
 }
-
