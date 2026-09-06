@@ -46,6 +46,7 @@ func main() {
 		Bind: []interface{}{
 			app,
 			app.timer,
+			app.session,
 		},
 	})
 
