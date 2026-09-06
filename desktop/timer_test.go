@@ -16,6 +16,9 @@ func (f *fakeClock) add(d time.Duration) { f.t = f.t.Add(d) }
 
 func newTestTimer(t *testing.T) (*TimerService, *fakeClock, *db.DB) {
 	t.Helper()
+	// Stub side-effecting completion hooks so tests stay quiet and race-free.
+	playFinish = func() {}
+	sendNotify = func(string, string) {}
 	d, err := db.OpenAt(filepath.Join(t.TempDir(), "p.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -91,6 +94,46 @@ func TestRehydrateExpiredCompletes(t *testing.T) {
 	all, _ := d.ListSessions(db.SessionFilter{})
 	if all[0].Status != model.StatusCompleted {
 		t.Fatalf("status = %s, want completed", all[0].Status)
+	}
+}
+
+func TestBreakFlow(t *testing.T) {
+	ts, clk, _ := newTestTimer(t)
+	ts.Start("x", 25)
+	clk.add(25 * time.Minute)
+	ts.tick()
+	if ts.GetState().Phase != PhaseBreakPrompt {
+		t.Fatal("want break_prompt")
+	}
+	st := ts.StartBreak(5)
+	if st.Phase != PhaseBreak || st.Remaining != 300 {
+		t.Fatalf("break state = %+v", st)
+	}
+	clk.add(5 * time.Minute)
+	ts.tick()
+	if ts.GetState().Phase != PhaseIdle {
+		t.Fatalf("break should end at idle, got %s", ts.GetState().Phase)
+	}
+}
+
+func TestSkipBreak(t *testing.T) {
+	ts, clk, _ := newTestTimer(t)
+	ts.Start("x", 25)
+	clk.add(25 * time.Minute)
+	ts.tick()
+	if ts.SkipBreak().Phase != PhaseIdle {
+		t.Fatal("skip should go idle")
+	}
+}
+
+func TestStartBreakIgnoredWhileRunning(t *testing.T) {
+	ts, _, d := newTestTimer(t)
+	ts.Start("x", 25)
+	if ts.StartBreak(5).Phase != PhaseRunning {
+		t.Fatal("StartBreak must not disturb a running session")
+	}
+	if s, _ := d.LastRunningSession(); s == nil {
+		t.Fatal("running session row was stranded / lost")
 	}
 }
 

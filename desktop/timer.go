@@ -16,6 +16,12 @@ import (
 	"pomo/internal/db"
 )
 
+// playFinish plays the completion chime; a package var so tests can stub it.
+var playFinish = sound.PlayFinish
+
+// sendNotify fires the desktop notification; a package var so tests can stub it.
+var sendNotify = func(title, body string) { _ = notify.New().Send(title, body) }
+
 // Phase is the timer's high-level state.
 type Phase string
 
@@ -169,6 +175,9 @@ func (t *TimerService) Cancel() State {
 func (t *TimerService) StartBreak(minutes int) State {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.st.Phase != PhaseBreakPrompt {
+		return t.st
+	}
 	now := t.clk.Now()
 	dur := minutes * 60
 	t.breakEndsAt = now.Add(time.Duration(dur) * time.Second)
@@ -185,6 +194,9 @@ func (t *TimerService) StartBreak(minutes int) State {
 func (t *TimerService) SkipBreak() State {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.st.Phase != PhaseBreakPrompt && t.st.Phase != PhaseBreak {
+		return t.st
+	}
 	t.st = State{Phase: PhaseIdle}
 	t.emit(EventPhase, t.st)
 	return t.st
@@ -250,8 +262,8 @@ func (t *TimerService) complete(now time.Time) {
 	}
 	task := t.st.Task
 	_ = t.db.FinishSession(t.st.SessionID, model.StatusCompleted, elapsed, "")
-	sound.PlayFinish()
-	go func() { _ = notify.New().Send("Pomodoro done", task) }()
+	playFinish()
+	go sendNotify("Pomodoro done", task)
 	t.st = State{Phase: PhaseBreakPrompt, Task: task}
 	t.emit(EventToday, nil)
 	t.emit(EventPhase, t.st)
