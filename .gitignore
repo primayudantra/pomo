@@ -13,3 +13,5 @@ daemon.status
 daemon.log
 
 .DS_Store
+
+.worktrees/
